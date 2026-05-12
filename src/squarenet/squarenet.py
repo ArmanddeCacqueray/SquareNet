@@ -22,7 +22,7 @@ class SquareNet:
 
     Parameters
     ----------
-    gridshape : tuple of int, default=(100, 100)
+    gridshape : tuple of int
         Shape of the target grid. The product of these dimensions must 
         exactly match the total number of input points (bijective gridification).
     max_iter : int, default=100
@@ -45,11 +45,11 @@ class SquareNet:
         History of the disorder metric across iterations.
     
     1. Run ``fit()`` with your preferred backend.
-    2. Call ``SquareNet.pack()`` once on your full dataset to 
-        boost map and invertmap operations
+    2. Call ``SquareNet.map()`` on any feature indexed like the points (N, *C)
+    To build a tensor version of it (*G, *C) based on the points learned multi-indexes
     """
 
-    def __init__(self, gridshape=(100, 100), max_iter = 500, warnings_=True, 
+    def __init__(self, gridshape, max_iter = 500, warnings_=True, 
                  verbose = 2, backend = "numpy", device = "cpu"):
         self.gridshape = tuple(gridshape)
         self.D = len(self.gridshape)
