@@ -44,8 +44,8 @@ d = 4
 X = np.random.rand(N, d)
 
 IJKL = (5, 11, 7, 13)
-sn = SquareNet(IJ_=IJKL) # Define grid dimensions, here 4D
-sn.fit(x)
+sn = SquareNet(gridshape=IJKL)# Define grid dimensions, here 4D
+sn.fit(X)
 
 # Map any data indexed on the points e.g (N, *C) to the grid 
 Xgrid = sn.map(X) #(5, 11, 7, 13, 4)
@@ -62,9 +62,9 @@ sn.search_sorted(point)
 ## 🗺️ Visualizing the Mapping
 
 ```python
-sn = SquareNet(IJ_=(400, 400))
+sn = SquareNet(gridshape=(400, 400))
 sn.fit("france") 
-sn.plot(style = "mesh")
+sn.plot()
 ```
 
 
