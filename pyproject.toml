@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "squarenet"
+version = "1.0.0"
+description = "Sparse local operations for point clouds in any dimension."
+authors = [{ name = "ArmanddeCacqueray", email = "armanddecacqueray@sfr.fr" }]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "matplotlib"
+]
+
+[project.urls]
+Homepage = "https://github.com/ArmanddeCacqueray/SquareNet"
+Documentation = "https://squarenet.readthedocs.io"
+PyPI = "https://pypi.org/project/squarenet/"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["data*"]

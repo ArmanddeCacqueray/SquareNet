@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+dist/
+build/
+test.ipynb
+*bubbletree.py
+03_bubble_tree.ipynb
+*.egg-info/
