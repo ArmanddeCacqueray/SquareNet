@@ -371,8 +371,7 @@ class SquareNet:
         ----------
         criterion : str, optional
             Method used to define neighborhoods ("rank" or "value").
-        thresholdcut : int or float, optional
-        Cutoff threshold for connections, interpreted according to the criterion.
+        thresholdcut : int or float, optional Cutoff threshold for connections, interpreted according to the criterion.
             - If criterion is "rank": thresholdcut = k means Y matches X
             if Y is among the k nearest points to X.
             - If criterion is "value": thresholdcut is a distance threshold,
