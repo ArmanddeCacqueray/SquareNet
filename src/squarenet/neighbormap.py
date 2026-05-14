@@ -17,11 +17,10 @@ def neighbormap(grided_points, mapidx, criterion = "rank", thresholdcut = 1,
 
     selection = None
 
-    if np.prod(gpts.shape)*(wr**2) >= sample_size:
+    if np.prod(gpts.shape)*(ws**2) >= sample_size:
         N = np.prod(gpts.shape[:-1])
-        D = gpts.shape[-1]
-        sample_size = min(sample_size//(D*wr*wr), N)
-        selection = np.random.choice(N, replace = False, size = sample_size)
+        sample_size_x = min(sample_size//(ws**2), N)
+        selection = np.random.choice(N, replace = False, size = sample_size_x)
         selection = mapidx(selection)
         
     pad_width = [(0, 0)]*(d+1)
