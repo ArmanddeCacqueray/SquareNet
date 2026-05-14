@@ -358,17 +358,30 @@ class SquareNet:
                       save = save, save_path = save_path,
                       cfg = plot_config)
     
-    def neighbormap(self, criterion="rank", thresholdcut=1,
+    def neighbormap(self, sample_size = 1_000_000, window_size = 41, criterion="rank", thresholdcut=1,
                 projection=(0, 1), log2=False):
         """
         Compute and display a neighborhood map from gridded points.
 
-        For each point X (or a subsample of 10_000 points if the dataset is too large),
-        scans a square window of radius 10 in the grid centered on X, and adds 1
+        For each point X (or a subsample of sample_size if the dataset is too large),
+        scans a square window of radius wr = ws//2 in the grid centered on X, and adds 1
         to each cell if the point Y found in the cell matches the criterion.
 
         Parameters
         ----------
+        sample_size: int, default 10_000
+            sample size for the number of pairs (X, Y)
+        window_size: int, default 21
+            Note that wr, the window radius, is ws//2
+            search window, or size of the window in wich the neighbormap will look, 
+            such that delta(gridindex(X), gridindex(Y)) <= wr = ws//2 
+            where delta is the L∞ norm in term of grid index.
+            /!\ It means that you will get no information, and thus no garantee 
+            at all, on what happens outside the search window.
+            /!\ On the other side, giving a big search window will dilute information
+            are there will be less probability to sample pairs at any given grid delta
+            So you must think on the best tradeoff.
+            
         criterion : str, optional
             Method used to define neighborhoods ("rank" or "value").
         thresholdcut : int or float, optional Cutoff threshold for connections, interpreted according to the criterion.
@@ -392,6 +405,8 @@ class SquareNet:
         nbmap = neighbormap(
             self.pointsmaped,
             self.mapidx,
+            sample_size = sample_size,
+            windowradius = window_size//2
             criterion=criterion,
             thresholdcut=thresholdcut,
             projection=projection
