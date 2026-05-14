@@ -358,7 +358,7 @@ class SquareNet:
                       save = save, save_path = save_path,
                       cfg = plot_config)
     
-    def neighbormap(self, sample_size = 1_000_000, window_size = 41, criterion="rank", thresholdcut=1,
+    def neighbormap(self, max_sample_size = 1_000_000, max_window_size = 41, criterion="rank", thresholdcut=1,
                 projection=(0, 1), log2=False):
         """
         Compute and display a neighborhood map from gridded points.
@@ -369,18 +369,24 @@ class SquareNet:
 
         Parameters
         ----------
-        sample_size: int, default 10_000
+        max_sample_size: int, default 1 million
             sample size for the number of pairs (X, Y)
-        window_size: int, default 21
-            Note that wr, the window radius, is ws//2
-            search window, or size of the window in wich the neighbormap will look, 
-            such that delta(gridindex(X), gridindex(Y)) <= wr = ws//2 
-            where delta is the L∞ norm in term of grid index.
-            /!\ It means that you will get no information, and thus no garantee 
-            at all, on what happens outside the search window.
-            /!\ On the other side, giving a big search window will dilute information
-            are there will be less probability to sample pairs at any given grid delta
-            So you must think on the best tradeoff.
+        max_window_size: int, default=21
+            Note that ``wr``, the window radius, is defined as
+            ``wr = window_size // 2``.      
+            Search window size, i.e. the size of the window in which the
+            neighbor map is computed, such that:      
+            ``offset(gridindex(X), gridindex(Y)) <= wr``    
+            where ``offset`` denotes the L∞ norm on grid indices.
+        
+            Warning
+            -------
+            You will get no information, and thus no garantee at all, 
+            on what happens outside the search window. Conversely, using 
+            a very large search window dilutes the information, since the 
+            probability of sampling pairs for a given grid offset decreases.
+        
+            Choosing the window size is therefore a tradeoff.
             
         criterion : str, optional
             Method used to define neighborhoods ("rank" or "value").
@@ -405,8 +411,8 @@ class SquareNet:
         nbmap = neighbormap(
             self.pointsmaped,
             self.mapidx,
-            sample_size = sample_size,
-            windowradius = window_size//2
+            sample_size = max_sample_size,
+            windowradius = max_window_size//2
             criterion=criterion,
             thresholdcut=thresholdcut,
             projection=projection
