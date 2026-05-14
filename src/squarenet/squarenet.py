@@ -5,7 +5,7 @@ from .core import carthesian_sort
 from .artist import sqplot, default_config
 from .sampler import samplepoints
 from .neighbormap import neighbormap
-from .utils import dualgrid, dualgridflat, to_backend, printmatrix
+from .utils import dualgrid, dualgridflat, from_backend, to_backend, printmatrix
 
 
 class SquareNet:
@@ -358,7 +358,7 @@ class SquareNet:
                       save = save, save_path = save_path,
                       cfg = plot_config)
     
-    def neighbormap(self, max_sample_size = 1_000_000, max_window_size = 41, criterion="rank", thresholdcut=1,
+    def neighbormap(self, max_sample_size = 40_000_000, max_window_size = 41, criterion="rank", thresholdcut=1,
                 projection=(0, 1), log2=False):
         """
         Compute and display a neighborhood map from gridded points.
@@ -369,6 +369,8 @@ class SquareNet:
 
         Parameters
         ----------
+        log2 : bool, default False
+            If True, applies log2 scaling to counts.
         max_sample_size: int, default 1 million
             sample size for the number of pairs (X, Y)
         max_window_size: int, default=21
@@ -397,9 +399,7 @@ class SquareNet:
             and Y matches X if the distance(X, Y) <= thresholdcut.
         projection : tuple of int, optional
             Axes of the grid used for 2D projection.
-        log2 : bool, optional
-            If True, applies log2 scaling to counts.
-
+            
         Returns
         -------
         None
@@ -409,10 +409,10 @@ class SquareNet:
         """
 
         nbmap = neighbormap(
-            self.pointsmaped,
+            from_backend(self.pointsmaped),
             self.mapidx,
             sample_size = max_sample_size,
-            windowradius = max_window_size//2
+            windowradius = max_window_size//2,
             criterion=criterion,
             thresholdcut=thresholdcut,
             projection=projection
