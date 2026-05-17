@@ -54,7 +54,7 @@ def np_carthesian_sort(gridmap, points, max_iter=100, verbose = 2, loop = None, 
             progress_bar((2*it)%100, 100)
         disorder = 0
         for d, heuristic in zip(Dims, circular_loop):
-            if it+d>0:
+            if not (it == 0 and d == Dims[0]):
                 g = heuristic[g]
             
             # --- 1. Check for convergence ---
