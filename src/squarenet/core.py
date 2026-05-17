@@ -51,6 +51,12 @@ def carthesian_sort(
     and avoid breaking symetry on the dims
     =============================================
     =============================================
+    ULTIMATE METHOD:
+    same but at each step neigbor lines are 
+    tangled and sorted together  to avoid
+    stratification.
+    =============================================
+    =============================================
     """
     if method == "robust":
         from .optim.core_robust import robust_carthesian_sort
@@ -62,7 +68,21 @@ def carthesian_sort(
             loop=loop,
             backend = backend,
         )
-
+    elif method == "ultimate":
+        from .optim.core_ultimate import tangled_carthesian_sort
+        return tangled_carthesian_sort(
+            gridmap, 
+            points, 
+            max_iter=max_iter, 
+            verbose=verbose, 
+            loop=loop,
+            backend = backend,
+        )
+    else:
+        if method != "fast":
+            raise ValueError(
+                f"Unknown method '{method}', expected 'fast', 'robust' or 'ultimate'"
+            )    
     if backend == "numpy":
         from .optim.core_numpy import np_carthesian_sort
         return np_carthesian_sort(
