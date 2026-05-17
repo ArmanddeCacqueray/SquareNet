@@ -27,7 +27,7 @@ def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None,
     init_loop, circular_loop, end_loop = loop_boost(points[:, Dims]) if loop is None else loop
     g = init_loop[g]
 
-    for it in range(max_iter):
+    for it in range(1000):
         if verbose >= 2:
             progress_bar(it % 100, 100)
             
