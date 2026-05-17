@@ -140,20 +140,23 @@ class SquareNet:
         points : ndarray of shape (N, D) or str
             Input point cloud or sampling method name.
         
-        method : fast or robust.
+        method : fast, robust or ultimate.
             robust can be up to 5 time slower, but
             will probably give a better grid.
+            ultimate can be up to 30 time slower
+            but will give the best results among the
+            three methods
 
         Returns 
         -------
         None
             The method updates the internal state of the grid in-place.
         
-        see ``squarenet.core_numpy``
+        see ``squarenet.core``
 
         Note
         -------
-        - robust fit method is 100% Numpy, which means there will
+        - robust and ultimate fit method are 100% Numpy, which means there will
             be some overhead backend -> numpy -> backend during the fit
 
         - fit is almost jitable for jax, but not as is.
@@ -176,7 +179,7 @@ class SquareNet:
         points = self._validate_points(points)
         self.points = points
 
-        _log("Starting gridification... available method [fast, robust]")
+        _log("Starting gridification... available method [fast, robust, ultimate]")
         _log(f"selected {method}")
 
         _section(f"Carthesian sort")
