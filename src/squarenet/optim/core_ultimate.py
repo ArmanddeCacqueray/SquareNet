@@ -1,7 +1,8 @@
 import numpy as np
-from .core_numpy import progress_bar, integer_boost, loop_boost
+from .core_numpy import integer_boost, loop_boost
+from ..utils import progress_bar, from_backend, to_backend
 
-def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, backend = "numpy", loopseq="decreasing"):
     """
     Iteratively sort a gridmap along its Cartesian dimensions to minimise spatial disorder.
 
