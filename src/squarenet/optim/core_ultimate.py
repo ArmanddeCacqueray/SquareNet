@@ -9,7 +9,11 @@ def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None,
     a pivot-based tangle/untangle phase to resolve non-local topological conflicts.
     Returns the sorted gridmap and the per-iteration disorder history.
     """
-    g = gridmap
+    device = "cpu"
+    if hasattr(gridmap, "device"):
+        device = gridmap.device
+    g = from_backend(gridmap)
+    pts = from_backend(points)
     gshape = np.array(g.shape)
     Dims = np.where(gshape > 1)[0]
 
@@ -41,8 +45,12 @@ def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None,
             for asl in antisl:
                 g[asl].sort(axis=d)
 
+    # last cleanup:
     g = end_loop[g]
-    return np.ascontiguousarray(g), None
+    g, learning_curve2 = np_carthesian_sort(g, pts, max_iter=max_iter, verbose = verbose, 
+                           loop = (init_loop, circular_loop, end_loop ), loopseq = loopseq)
+    gridmap = to_backend(g, backend = backend, device = device, warnings_ = verbose >=1)
+    return gridmap, learning_curve2
 
 
 def make_even_pivot(g, dpivot):
