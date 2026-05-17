@@ -1,5 +1,5 @@
 import numpy as np
-from .core_numpy import integer_boost, loop_boost
+from .core_numpy import np_carthesian_sort, integer_boost, loop_boost
 from ..utils import progress_bar, from_backend, to_backend
 
 def tangled_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, backend = "numpy", loopseq="decreasing"):
