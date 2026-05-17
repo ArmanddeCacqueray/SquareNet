@@ -69,7 +69,16 @@ def carthesian_sort(
             backend = backend,
         )
     elif method == "ultimate":
+        from .optim.core_robust import robust_carthesian_sort
         from .optim.core_ultimate import tangled_carthesian_sort
+        gridmap, _ = robust_carthesian_sort(
+            gridmap,
+            points,
+            max_iter=max_iter,
+            verbose=verbose,
+            loop=loop,
+            backend = backend,
+        )
         return tangled_carthesian_sort(
             gridmap, 
             points, 
