@@ -1,131 +1,216 @@
 import numpy as np
 from ..utils import progress_bar
+from .numpy.booster import loop_boost
+from .numpy.subgrid import random_subgrid_split
+from .numpy.hashtable import HashTable
 
 """"
 =============================================
-=============================================
-Numpy version of carthesian sort,
-with a boosted circular loop
-=============================================
+Carthesian sort - fast, robust and ultimate
 =============================================
 """
 
-def np_carthesian_sort(gridmap, points, max_iter=100, verbose = 2, loop = None, loopseq = "decreasing"):
-    """
-    Args: 
-        -gridmap (np.array of ints):
-        an initial gridmap such that cloud_features[gridmap] 
-        write any feature (N, *C) of the point-cloud (N, D) 
-        on a grid (N1, ..., ND, *C)
+def numpy_carthesian_sort(
+    gridmap,
+    points,
+    method="fast",
+    max_iter=100,
+    verbose=2,
+    loop=None,
+    loopseq="decreasing"
+):
+    methods = {
+        "fast": fast_carthesian_sort,
+        "robust": robust_carthesian_sort,
+        "ultimate": ultimate_carthesian_sort,
+    }
 
-        -max_iter (int):
-        last step after which algorithm shall stop
-        even if it hasn't converged yet
-    Returns:
-        -gridmap
-        sorted gridmap such that cloud_features[gridmap]
-        now write the feature on a spatially coherent grid
-        -learningcurve (list of values):
-        track the performance of the optimisation process.
-        should converge to 0
-    """
+    if method not in methods:
+        raise ValueError(
+            f"Unknown method '{method}'. "
+            f"Expected one of {list(methods.keys())}"
+        )
+
+    return methods[method](
+        gridmap,
+        points,
+        max_iter=max_iter,
+        verbose=verbose,
+        loop=loop,
+        loopseq=loopseq,
+    )
+
+# ─────────────────────────────────────────────
+# Shared helpers
+# ─────────────────────────────────────────────
+
+def _prepare(gridmap, points, loop, loopseq):
+    """Compute Dims (ordered), resolve loop, apply init_loop to g."""
     g = gridmap
     gshape = np.array(g.shape)
-    Dims = np.where(gshape > 1)[0] #exclude manifold dimensions
+    Dims = np.where(gshape > 1)[0]
 
     if loopseq == "decreasing":
         Dims = Dims[np.argsort(-gshape[Dims])]
     elif loopseq == "random":
-        Dims = np.random.permute(Dims)
+        Dims = np.random.permutation(Dims)
     else:
-        raise(f"unknown loopseq {loopseq}, should be 'decreasing'or 'random'")
+        raise ValueError(f"unknown loopseq {loopseq!r}, should be 'decreasing' or 'random'")
+
+    if loop is None:
+        loop = loop_boost(points[:, Dims])
+    init_loop, circular_loop, end_loop = loop
+
+    g = init_loop[g]
+    return g, Dims, loop, circular_loop, end_loop
 
 
+def _check_convergence(g, Dims):
+    """Return total disorder count across all active dimensions."""
+    return sum(int(np.sum(np.diff(g, axis=d) < 0)) for d in Dims)
+
+
+def _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose):
+    """Apply end_loop then run a final fast_carthesian_sort pass."""
+    g = end_loop[g]
+    g, lc = fast_carthesian_sort(
+        g, points,
+        max_iter=max_iter, verbose=verbose,
+        loop=loop, loopseq=loopseq,
+    )
+    return np.ascontiguousarray(g), lc
+
+
+def _log(verbose, it, max_iter, done=False):
+    if verbose >= 2:
+        progress_bar((max_iter - 1) if done else it % max_iter, max_iter)
+
+
+# ─────────────────────────────────────────────
+# Core sort loop (used by fast_carthesian_sort)
+# ─────────────────────────────────────────────
+
+def _run_sort_loop(g, Dims, circular_loop, max_iter, verbose, skip_first_heuristic=True):
+    """
+    Standard circular sort loop.
+    Returns (g, learning_curve).
+    skip_first_heuristic replicates the original `if not (it == 0 and d == Dims[0])` guard.
+    """
     learning_curve = []
 
-    #init_loop: index to heuristic 0
-    #loop[d+1]: heuristic d to heuristic (d+1)%D
-    #end_loop: heuristic D-1 to index
-    init_loop, circular_loop, end_loop = loop_boost(points[:, Dims]) if loop is None else loop
-    g = init_loop[g]
-    
     for it in range(max_iter):
-        if verbose >= 2:
-            progress_bar((2*it)%100, 100)
+        _log(verbose, it, max_iter)
         disorder = 0
-        for d, heuristic in zip(Dims, circular_loop):
-            if not (it == 0 and d == Dims[0]):
+
+        for d_id, (d, heuristic) in enumerate(zip(Dims, circular_loop)):
+            if not (skip_first_heuristic and it == 0 and d_id == 0):
                 g = heuristic[g]
-            
-            # --- 1. Check for convergence ---
-            diff = np.diff(g, axis=d)
-            disorder += np.sum(diff < 0)
 
-            # --- 2. Sorting Phase ---
-            g.sort(axis = d)
+            disorder += _check_convergence(g, [d])
+            g.sort(axis=d)
 
-        learning_curve.append(disorder)           
+        learning_curve.append(disorder)
         if disorder == 0:
-            if verbose >=2:
-                progress_bar(99, 100)
+            _log(verbose, it, max_iter, done=True)
             break
 
-    # last cleanup:
-    g = end_loop[g]
-    gridmap = np.ascontiguousarray(g)
-    return gridmap, learning_curve
-# ============================================
-# ============================================
-# Boosters
-# ============================================
-# ============================================
-def integer_boost(points):
+    return g, learning_curve
+
+
+# ─────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────
+
+def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """
-    Booster: Convert points to integer 
-    to boost sort_increasing function
-
     Args:
-        - points (np.ndarray) (N,D): point cloud
-
+        gridmap (np.ndarray[int]): index map such that cloud_features[gridmap]
+            writes any feature (N, *C) of the point-cloud (N, D) on a grid.
+        max_iter (int): maximum number of iterations.
     Returns:
-        - h_int (list of np.uint32 arrays): points as integers
+        gridmap: spatially coherent sorted index map.
+        learning_curve (list): disorder per iteration; converges to 0.
     """
-    N, D = points.shape
-    h_int = []
-    for d in range(D):
-        order = np.argsort(points[:, d])      
-        ranks = np.empty(N, dtype=np.int32)
-        ranks[order] = np.arange(N)
-        h_int.append(ranks)
-    return h_int
+    g, Dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+    g, learning_curve = _run_sort_loop(g, Dims, circular_loop, max_iter, verbose)
 
-def loop_boost(points):
+    g = end_loop[g]
+    return np.ascontiguousarray(g), learning_curve
+
+
+def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """
-    Booster: make looping over axis a bit faster
+    Robust variant: sorts only random independent subgrids each iteration to
+    escape local minima, then finishes with a standard fast_carthesian_sort pass.
 
-    Args:
-        - points (np.ndarray) (N,D): point cloud
-    Return:
-        - loop (...): list of permutations such that 
-        loop[d](h_int[d][n]) = h_int[d+1][n]
-        - end_loop (...): permutation such that 
-        end_loop(h_int[-1][n]) = n 
+    Args / Returns: same as fast_carthesian_sort.
     """
-    int_boost = integer_boost(points)
-    N = len(int_boost[0])
-    identity = np.arange(N, dtype=np.int32)
-    #start the loop
-    h_int =  [identity] + int_boost
-    #close the loop
-    h_int_plus = int_boost + [identity]
-    loop = []
+    g, Dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+    gshape = np.array(gridmap.shape)
 
-    for h, hplus in zip(h_int, h_int_plus):
-        sigma = np.zeros(N, dtype=np.int32)
-        sigma[h] = hplus
-        loop.append(np.ascontiguousarray(sigma))
-        
-    init_loop, end_loop = loop[0], loop[-1]
-    circular_loop = loop[:-1]
-    circular_loop[0] = init_loop[end_loop]
-    return init_loop, circular_loop, end_loop
+    learning_curve = []
+    circular = False
+
+    for it in range(max_iter):
+        _log(verbose, it, max_iter)
+        disorder = 0
+
+        subgrids = random_subgrid_split(gshape[Dims], Dims)
+
+        for d_id, (d, heuristic) in enumerate(zip(Dims, circular_loop)):
+            if circular:
+                g = heuristic[g]
+            circular = True
+
+            disorder += _check_convergence(g, [d])
+
+            for sub in subgrids[d_id]:
+                gsub = g[sub]
+                gsub.sort(axis=d)
+                g[sub] = gsub
+
+        learning_curve.append(disorder)
+        if disorder == 0:
+            _log(verbose, it, max_iter, done=True)
+            break
+
+    g, lc2 = _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose)
+    if verbose >= 2:
+        print("")
+
+    return g, learning_curve + lc2
+
+
+def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+    """
+    Ultimate variant: runs robust_carthesian_sort, then refines with a
+    HashTable-based sort phase for 4×max_iter iterations.
+
+    Args / Returns: same as fast_carthesian_sort.
+    """
+    g, Dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+
+    # Phase 1 — robust sort
+    g, learning_curve = robust_carthesian_sort(
+        g, points,
+        max_iter=max_iter, verbose=verbose,
+        loop=loop, loopseq=loopseq,
+    )
+
+    # Phase 2 — HashTable refinement
+    htable = HashTable(g, Dims)
+    circular = False
+
+    for it in range(4 * max_iter):
+        _log(verbose, it, max_iter)
+        for heuristic in circular_loop:
+            if circular:
+                htable.gtable = heuristic[htable.gtable]
+            circular = True
+            htable.sort()
+
+    if verbose >= 2:
+        print("")
+
+    g, lc2 = _cleanup(htable.gtable, points, end_loop, loop, loopseq, max_iter, verbose)
+    return g, learning_curve + lc2

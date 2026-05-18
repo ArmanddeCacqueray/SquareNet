@@ -1,134 +1,304 @@
+from importlib import import_module
+
+_BACKENDS = {
+    "numpy": ".optim.core_numpy",
+    "jax": ".optim.core_jax",
+    "torch": ".optim.core_torch",
+}
+
+def _load_backend(name: str):
+    if name not in _BACKENDS:
+        raise ValueError(
+            f"Unknown backend '{name}', expected one of {list(_BACKENDS)}"
+        )
+    module = import_module(_BACKENDS[name], package=__package__)
+    return getattr(module, f"{name}_carthesian_sort")
+
+
 def carthesian_sort(
     gridmap,
     points,
     max_iter=100,
-    method = "fast",
+    method="fast",
     backend="numpy",
     loop=None,
+    loopseq="decreasing",
     verbose=2,
 ):
-    """"
-    =============================================
-    =============================================
-     FAST METHOD
-    =============================================
-    =============================================
-    PSEUDO-CODE: convert unstructured point cloud (N, D) 
-    to a grid (N1, ..., ND, D) by iteratively sorting 
-    the d-est heuristic along the d-est axis
-
-    We can see the grid as D iterators on the points 
-    such that axis-d iterator maps  the point 
-    P(n ~ n1...nd...nD) to the "next" point
-    Pnext(n ~ n1...nd+1...nD). Let call it Pnext(n, d)
-
-    We can select D euclidian heuristics
-    H(d): (x, y, z,...) -> value which we want to 
-    be increasing along the d-est axis of the grid
-    It turns out that H(0) = x, H(1) = y,.... is
-    already a pretty good heuristic.
-
-    So the goal is simply to ensure that all
-    points are sorted along the grid, in the
-    sense that for all point P(n) and axis d,
-    H(d)(P(n)) <= H(d)(Pnext(n, d))
-
-    We can compute a grid disorder parameter which is
-    just the counts of all P, Pnext which breaks this 
-    inequality
-    =============================================
-    Sort_increasing is then pretty simple:
-    For learning step in (1, Max_iter = 100)
-        For d in (1, D):
-            sort heuristic d along axis d.
-        Check disorder
-        If disorder = 0, we are done !
-    =============================================
-    =============================================
-    ROBUST METHOD:
-    same but at each step only a subgrid of the
-    grid is sorted to make learning progressive
-    and avoid breaking symetry on the dims
-    =============================================
-    =============================================
-    ULTIMATE METHOD:
-    same but at each step neigbor lines are 
-    tangled and sorted together  to avoid
-    stratification.
-    =============================================
-    =============================================
     """
-    if method == "robust":
-        from .optim.core_robust import robust_carthesian_sort
-        return robust_carthesian_sort(
-            gridmap,
-            points,
-            max_iter=max_iter,
-            verbose=verbose,
-            loop=loop,
-            backend = backend,
-        )
-    elif method == "ultimate":
-        from .optim.core_robust import robust_carthesian_sort
-        from .optim.core_ultimate import tangled_carthesian_sort
-        gridmap, _ = robust_carthesian_sort(
-            gridmap,
-            points,
-            max_iter=max_iter,
-            verbose=verbose,
-            loop=loop,
-            backend = backend,
-        )
-        return tangled_carthesian_sort(
-            gridmap, 
-            points, 
-            max_iter=max_iter, 
-            verbose=verbose, 
-            loop=loop,
-            backend = backend,
-        )
-    else:
-        if method != "fast":
-            raise ValueError(
-                f"Unknown method '{method}', expected 'fast', 'robust' or 'ultimate'"
-            )    
-    if backend == "numpy":
-        from .optim.core_numpy import np_carthesian_sort
-        return np_carthesian_sort(
-            gridmap,
-            points,
-            max_iter=max_iter,
-            verbose=verbose,
-            loop=loop,
-        )
+    Supported:
+    ----
+    method [fast, robust, ultimate]
+    backend [numpy, jax, torch]
 
-    elif backend == "jax":
-        from .optim.core_jax import jax_carthesian_sort
 
-        if verbose >= 2:
-            print("jax working ...")
+    Goal
+    ----
+    Given an unordered point cloud:
 
-        return jax_carthesian_sort(
-            gridmap,
-            points,
-            max_iter=max_iter,
-            loop=loop,
-        )
+        points.shape = (N, D)
 
-    elif backend == "torch":
-        from .optim.core_torch import torch_cartesian_sort
+    rearrange point indices into a structured cartesian grid:
 
-        if verbose >= 2:
-            print("torch working ...")
+        grid.shape = (N1, N2, ..., ND)
 
-        return torch_cartesian_sort(
-            gridmap,
-            points,
-            max_iter=max_iter,
-            loop=loop,
-        )
+    such that neighbouring cells of the grid contain spatially
+    coherent points.
 
-    else:
-        raise ValueError(
-            f"Unknown backend '{backend}', expected 'numpy', 'jax' or 'torch'"
-        )
+    ============================================================
+    GRID INTERPRETATION
+    ============================================================
+
+    A grid index map bijectively to a point index:
+
+        point index: n <=> grid index: f(n) = (n1, n2, ..., nD)
+
+    Each grid axis defines a local neighbour relation.
+
+    For axis d, let define:
+
+        next(n, d) = f-1(n1,..., nd+1,...,nD)
+
+    such that P(next(n,d)) is the neighbour obtained by 
+    incrementing the d-th grid coordinate.
+
+    The objective is therefore:
+
+    nearby euclidean points -> nearby grid cells
+
+    Note that the reciprocal property
+
+        nearby grid cells -> nearby euclidean points
+
+    is NOT guaranteed.
+
+    Indeed, datasets may contain cracks, holes, disconnected
+    clusters, folds, or other topological singularities.
+
+    Gridification will naturally tend to close cracks, stitch
+    nearby boundaries together and overlap the folds.
+
+    This algorithm is primarily designed for speed and scalability
+    on large datasets. It is NOT an optimal transport solver.
+
+    Therefore, users should always inspect the resulting grid,
+    especially near boundaries where geometric distortions are
+    more likely to appear.
+
+
+    ============================================================
+    HEURISTIC ORDERING PRINCIPLE
+    ============================================================
+
+    For each spatial dimension d, define d spatial heuristics:
+
+        H_d(point) -> scalar
+    
+    Heuristics must be orthogonal and monotonic
+    Typical choice: cartesian heuristics
+
+        H_0 = x
+        H_1 = y
+        H_2 = z
+        ...
+    One could think on an improved version of the algorithm
+    which would learn heuristics that best fit the dataset
+    but cartesian are already pretty good
+
+    The desired property is:
+
+        H_d(P(n)) <= H_d(P(next(n, d)))
+
+    for every point index n and every axis d.
+
+    In words:
+
+        values of heuristic d should increase
+        along grid axis d.
+
+
+    ============================================================
+    DISORDER METRIC
+    ============================================================
+
+    A local inversion occurs when:
+
+        H_d(P(n)) > H_d(P(next(n, d)))
+
+    The total disorder is simply the number of such violations.
+
+    Pseudo-definition:
+
+        disorder =
+            sum over all axes d
+            sum over all point pairs (current, next)
+            of inversion count
+
+
+    ============================================================
+    FAST METHOD
+    ============================================================
+
+    The simplest strategy consists in repeatedly sorting each
+    grid axis independently.
+
+    Pseudo-code
+    ------------
+
+    initialize gridmap
+
+    for iteration in range(max_iter):
+
+        for axis d in range(D):
+
+            sort grid indexes along axis d
+            using heuristic H_d
+
+        compute disorder
+
+        if disorder == 0:
+            stop
+
+
+    Properties
+    ----------
+
+    Advantages:
+        - extremely fast
+        - fully vectorized
+        - memory efficient
+        - surprisingly effective
+
+    Limitations:
+        - for loop on the axes
+         -> early axes dominate later ones
+         -> result in weak axes
+        - only adjacent comparison is a weak accuracy criterion
+         -> disorder is blind on what happens on diagonals
+         -> may converge toward local minima
+
+
+    ============================================================
+    ROBUST METHOD
+    ============================================================
+
+    To reduce axis domination and improve stability,
+    sorting is performed only on random independent subgrids at 
+    each step, thus learning is much more progressiv
+
+    At every iteration:
+
+        - each axis is randomly partitioned
+        - only selected cartesian sub-blocks are sorted
+        - different blocks are used for different axes
+
+    Result:
+
+        - smoother convergence
+        - better axis symmetry
+        - fewer local minima
+        - improved isotropy
+
+
+    Pseudo-code
+    ------------
+
+    for iteration:
+
+        generate random cartesian subgrids
+
+        for axis d:
+
+            for subgrid in selected_subgrids[d]:
+
+                sort only inside this subgrid
+
+        compute disorder
+
+
+    ============================================================
+    ULTIMATE METHOD
+    ============================================================
+
+    Even robust cartesian sorting still treats grid lines
+    as parallel and therefore almost independent.
+
+    This can produce:
+
+        - stratification
+        - layered artifacts
+        - weak coupling between parallel slices
+
+    To solve this, a second refinement stage is introduced.
+
+    The grid is embedded into a "hash table"
+    containing shifted/sheared copies of the grid.
+
+    Repeated cyclic shears produce strong cross-line coupling.
+
+    This allows information to propagate between previously
+    independent cartesian lines.
+
+
+    High-level idea
+    ----------------
+
+    repeat:
+
+        shear grid into staggered hash table
+
+        sort along one axis
+
+        project back to grid
+
+
+
+    Effect
+    ------
+
+    The repeated shearing progressively destroys artificial
+    parallel structures and greatly reduces stratification.
+    ============================================================
+    SUMMARY
+    ============================================================
+
+    FAST:
+        deterministic global line sorting (cartesian sort)
+
+    ROBUST:
+        stochastic partial sorting
+        preserving axis symmetry
+
+    ULTIMATE:
+        sheared multi-pass relaxation
+        reducing stratification artifacts
+
+
+    ============================================================
+    COMPLEXITY
+    ============================================================
+
+    A few hundreds iterations will be largely 
+    enough for convergence in most of the cases.
+
+    Let:
+
+        N = total number of points
+
+    Each iteration performs approximately:
+
+        O(N (log N +D)) operations
+
+    with highly vectorized NumPy operations.
+    """
+
+    kwargs = {
+        "method": method,
+        "max_iter": max_iter,
+        "loop": loop,
+        "loopseq": loopseq,
+        "verbose": verbose,
+    }
+
+    fn = _load_backend(backend)
+    return fn(gridmap, points, **kwargs)

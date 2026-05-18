@@ -132,16 +132,19 @@ def to_backend(x, backend="numpy", device = "cpu", warnings_ = True):
 
     if backend == "torch":
         import torch
+        device = torch.device(device)
+        x_device = getattr(x, "device", None)
         if (
             warnings_
-            and hasattr(x, "device")
-            and str(x.device) != device
-            and device == "cpu"
+            and x_device is not None
+            and hasattr(x_device, "type")
+            and x_device.type == "cpu"
+            and device.type != "cpu"
         ):
             warn(
-                "Downgrading tensor to CPU because "
-                "self.device='cpu'. Was this intended?"
+                "Downgrading tensor as initial device was GPU but asked device is CPU"
             )
+
         return torch.as_tensor(x, device=device)
 
     if backend == "jax":

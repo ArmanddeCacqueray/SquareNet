@@ -30,7 +30,7 @@ def neighbormap(grided_points, mapidx, criterion = "rank", thresholdcut = 1,
         gpts,
         pad_width=pad_width,
         mode="constant",
-        constant_values = np.inf
+        constant_values = 1_234_567
     )
 
     gview = sliding_window_view(

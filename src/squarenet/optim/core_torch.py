@@ -1,132 +1,173 @@
 """
 PyTorch implementation of Cartesian sort
-GPU compatible
-
-Typical usage
--------------
->>> def step(g, pts_flat):
-...     g, lc = torch_cartesian_sort(g, pts_flat)
-...     pts_grid = pts_flat[g]  # (*G, D)
-...
-...     # apply some logic on gridified points...
-...     # ... and back to flat structure
-...     pts_flat = pts_grid.reshape(-1, D)  # (N, D)
-...     return g, pts_flat
+GPU compatible with Chunked (Big Step) Optimization
 """
 
 import torch
+from .torch.booster import loop_boost
+from .torch.subgrid import random_subgrid_split
+from .torch.hashtable import HashTable
 
+
+# ============================================================================
+# Public API
+# ============================================================================
+
+def torch_carthesian_sort(gridmap, points, method="fast", max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+    """PyTorch Cartesian sorting supporting CPU/GPU (Multi-method Dispatcher)."""
+    if verbose >= 2:
+        print(f"torch working ({method}) ...")
+
+    methods = {
+        "fast": fast_carthesian_sort,
+        "robust": robust_carthesian_sort,
+        "ultimate": ultimate_carthesian_sort,
+    }
+
+    if method not in methods:
+        raise ValueError(f"Unknown method '{method}'. Expected one of {list(methods.keys())}")
+
+    return methods[method](
+        gridmap, points, max_iter=max_iter, verbose=verbose, loop=loop, loopseq=loopseq
+    )
 
 # ============================================================================
 # Helpers
 # ============================================================================
 
-def _active_dims(g):
-    shape = list(g.shape)
-    dims = [i for i, s in enumerate(shape) if s > 1]
-    dims.sort(key=lambda d: -shape[d])
-    return tuple(dims)
-
-
-# ============================================================================
-# Integer / permutation boosts
-# ============================================================================
-
-def integer_boost(points):
-    points = torch.as_tensor(points)
-
-    N, D = points.shape
-    device = points.device
-
-    ranks = []
-
-    for d in range(D):
-        order = torch.argsort(points[:, d])
-
-        rank = torch.empty(N, dtype=torch.long, device=device)
-        rank[order] = torch.arange(N, dtype=torch.long, device=device)
-
-        ranks.append(rank)
-
-    return tuple(ranks)
-
-
-def loop_boost(points):
-    int_boost = integer_boost(points)
-
-    N = int_boost[0].shape[0]
-    device = points.device
-
-    identity = torch.arange(N, dtype=torch.long, device=device)
-
-    h_sources = (identity,) + int_boost
-    h_targets = int_boost + (identity,)
-
-    loop = tuple(
-        _scatter_perm(h, hp, N, device)
-        for h, hp in zip(h_sources, h_targets)
-    )
-
-    init_loop = loop[0]
-    end_loop = loop[-1]
-
-    circular_loop = list(loop[:-1])
-    circular_loop[0] = init_loop[end_loop]
-
-    return init_loop, tuple(circular_loop), end_loop
-
-
-def _scatter_perm(h, hp, N, device):
-    out = torch.zeros(N, dtype=torch.long, device=device)
-    out[h] = hp
-    return out
-
-
-# ============================================================================
-# Main algorithm
-# ============================================================================
-
-def torch_cartesian_sort(gridmap, points, max_iter=100, loop=None):
-
-    g = torch.as_tensor(gridmap, dtype=torch.long)
+def _prepare(gridmap, points, loop, loopseq):
+    g = torch.as_tensor(gridmap, dtype=torch.int32)
     points = torch.as_tensor(points, device=g.device)
+    shape = list(g.shape)
+    
+    dims = [i for i, s in enumerate(shape) if s > 1]
 
-    dims = _active_dims(g)
+    if loopseq == "decreasing":
+        dims.sort(key=lambda d: -shape[d])
+    elif loopseq == "random":
+        import random
+        random.shuffle(dims)
+    else:
+        raise ValueError(f"unknown loopseq {loopseq!r}, should be 'decreasing' or 'random'")
 
-    if len(dims) == 0:
-        raise ValueError("gridmap has no active dimensions")
+    dims = tuple(dims)
 
     if loop is None:
         loop = loop_boost(points[:, dims])
-
     init_loop, circular_loop, end_loop = loop
 
     g = init_loop[g]
+    return g, dims, loop, circular_loop, end_loop
 
-    learning_curve = torch.zeros(max_iter + 1, dtype=torch.long, device=g.device)
-    disorder = torch.tensor(1, dtype=torch.long, device=g.device)
 
-    it = 0
+def _check_convergence(g, dims, circular_loop):
+    disorder = 0
+    for d_id, (d, heuristic) in enumerate(zip(dims, circular_loop)):
+                g = heuristic[g]
+                disorder += (torch.diff(g, dim=d) < 0).sum().item()
+
+    # .item() causes a CPU-GPU sync. Call this sparingly!
+    return disorder
+
+
+def _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose):
+    g = end_loop[g]
+    g, lc = fast_carthesian_sort(
+        g, points,
+        max_iter=max_iter, verbose=verbose,
+        loop=loop, loopseq=loopseq,
+    )
+    return g.contiguous(), lc
+
+
+# ============================================================================
+# Core Sort Implementations
+# ============================================================================
+
+def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+    g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+
+    learning_curve = []
+    chunk_size = 10
     first_dim = dims[0]
 
-    while (disorder > 0) and (it < max_iter):
+    # Warmup: Handle the very first step manually to avoid 'if' conditions in the loop
+    for k, d in enumerate(dims):
+        if d != first_dim:
+            g = circular_loop[k][g]
+        g = torch.sort(g, dim=d).values
 
-        disorder = torch.tensor(0, dtype=torch.long, device=g.device)
+    for _ in range(max_iter // chunk_size):
+        # 10 blind unrolled iterations
+        for _ in range(chunk_size):
+            for k, d in enumerate(dims):
+                g = circular_loop[k][g]
+                g = torch.sort(g, dim=d).values
 
-        for k, d in enumerate(dims):
-
-            heuristic = circular_loop[k]
-
-            if not (it == 0 and d == first_dim):
-                g = heuristic[g]
-
-            disorder = disorder + (torch.diff(g, dim=d) < 0).sum()
-            g = torch.sort(g, dim=d).values
-
-        learning_curve[it] = disorder
-        it += 1
+        # Single convergence check per chunk
+        disorder = _check_convergence(g, dims, circular_loop)
+        learning_curve.append(disorder)
+        if disorder == 0:
+            break
 
     sorted_grid = end_loop[g]
-    learning_curve = learning_curve[:it]
+    return sorted_grid, torch.tensor(learning_curve, dtype=torch.int32, device=g.device)
 
-    return sorted_grid, learning_curve
+
+def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+    g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+    gshape = list(gridmap.shape)
+
+    learning_curve = []
+    circular = False
+    chunk_size = 10
+
+    for big_it in range(max_iter // chunk_size):
+        # 10 blind unrolled inner steps
+        for _ in range(chunk_size):
+            subgrids = random_subgrid_split(gshape, dims, device=g.device)
+
+            for d_id, (d, heuristic) in enumerate(zip(dims, circular_loop)):
+                if circular:
+                    g = heuristic[g]
+                circular = True
+
+                for sub in subgrids[d_id]:
+                    g[sub] = torch.sort(g[sub], dim=d).values
+
+        # Check convergence only once per chunk
+        disorder = _check_convergence(g, dims, circular_loop)
+        learning_curve.append(disorder)
+        if disorder == 0:
+            break
+
+    g, lc2 = _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose)
+    full_lc = torch.cat([torch.tensor(learning_curve, dtype=torch.int32, device=g.device), lc2])
+    return g, full_lc
+
+
+def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+    g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
+
+    # Phase 1 — Robust sort
+    g, lc1 = robust_carthesian_sort(
+        g, points,
+        max_iter=max_iter, verbose=verbose,
+        loop=loop, loopseq=loopseq,
+    )
+
+    # Phase 2 — HashTable refinement with big steps
+    htable = HashTable(g, dims)
+    circular = False
+    chunk_size = 10
+
+    for big_it in range((4 * max_iter) // chunk_size):
+        for _ in range(chunk_size):
+            for heuristic in circular_loop:
+                if circular:
+                    htable.gtable = heuristic[htable.gtable]
+                circular = True
+                htable.sort()
+
+    g, lc2 = _cleanup(htable.gtable, points, end_loop, loop, loopseq, max_iter, verbose)
+    return g, torch.cat([lc1, lc2])

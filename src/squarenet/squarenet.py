@@ -49,7 +49,7 @@ class SquareNet:
     To build a tensor version of it (*G, *C) based on the points learned multi-indexes
     """
 
-    def __init__(self, gridshape, max_iter = 500, warnings_=True, 
+    def __init__(self, gridshape, max_iter = 1_000, warnings_=True, 
                  verbose = 2, backend = "numpy", device = "cpu"):
         self.gridshape = tuple(gridshape)
         self.D = len(self.gridshape)
@@ -131,7 +131,7 @@ class SquareNet:
     # ------------------------------------------------------------------
     # Core API
     # ------------------------------------------------------------------
-    def fit(self, points, method = "fast"):
+    def fit(self, points, method = "fast", fit_with_numpy = False):
         """
         Fit the grid to a point cloud.
 
@@ -145,7 +145,14 @@ class SquareNet:
             will probably give a better grid.
             ultimate can be up to 30 time slower
             but will give the best results among the
-            three methods
+            three methods.
+
+        fit_with_numpy :
+            wether to apply conversion to numpy
+            (just for the fit) and fit with numpy method.
+            Might be faster, always consider it as an option.
+            Default is to fit on the backend (and device)
+            given at init e.g. numpy, torch or jax.
 
         Returns 
         -------
@@ -153,18 +160,11 @@ class SquareNet:
             The method updates the internal state of the grid in-place.
         
         see ``squarenet.core``
-
-        Note
-        -------
-        - robust and ultimate fit method are 100% Numpy, which means there will
-            be some overhead backend -> numpy -> backend during the fit
-
-        - fit is almost jitable for jax, but not as is.
-        Fot a jax jit friendly fit, see ``squarenet.squarenet.jitable_fit``
         """
-        if method == "robust":
-            if self.fitted:
-                self._reset_state()
+        old_backend = self.backend
+        if fit_with_numpy:
+            #just for the fit, will be updated after
+            self.backend = "numpy"
 
         max_iter = self.max_iter
         verbose = self.verbose
@@ -177,12 +177,19 @@ class SquareNet:
                 print(f"\n=== {title} ===")
 
         points = self._validate_points(points)
-        self.points = points
+        self.points = points.clone() if hasattr(points, "clone") else points.copy()
 
         _log("Starting gridification... available method [fast, robust, ultimate]")
         _log(f"selected {method}")
 
         _section(f"Carthesian sort")
+        mi = max_iter
+        if method == "fast":
+            _log(f"(max iter: {mi})")
+        if method == "robust":
+            _log(f"(max iter: 2 x {mi})")
+        if method == "ultimate":
+            _log(f"(max iter: 2 x {mi} + 4 x {mi} + {mi})")
 
         self.grid, lc = carthesian_sort(self.grid, points, max_iter=max_iter, method = method,
                                         backend = self.backend, verbose = self.verbose)
@@ -214,7 +221,11 @@ class SquareNet:
                         ConvergenceWarning,
                         stacklevel=2,
                     )
-
+        
+        if fit_with_numpy:
+            self.backend = old_backend
+            self.grid = to_backend(self.grid, backend = self.backend, device = self.device)
+            self.points = to_backend(self.points, backend = self.backend, device = self.device)
         # --------------------------------------------------
         # Update mappings
         # --------------------------------------------------
@@ -361,7 +372,7 @@ class SquareNet:
                       save = save, save_path = save_path,
                       cfg = plot_config)
     
-    def neighbormap(self, max_sample_size = 40_000_000, max_window_size = 41, criterion="rank", thresholdcut=1,
+    def neighbormap(self, max_sample_size = 20_000_000, max_window_size = 31, criterion="rank", thresholdcut=1,
                 projection=(0, 1), log2=False):
         """
         Compute and display a neighborhood map from gridded points.
@@ -374,15 +385,15 @@ class SquareNet:
         ----------
         log2 : bool, default False
             If True, applies log2 scaling to counts.
-        max_sample_size: int, default 1 million
+        max_sample_size: int, default 20 million
             sample size for the number of pairs (X, Y)
-        max_window_size: int, default=21
+        max_window_size: int, default=31
             Note that ``wr``, the window radius, is defined as
             ``wr = window_size // 2``.      
             Search window size, i.e. the size of the window in which the
             neighbor map is computed, such that:      
-            ``offset(gridindex(X), gridindex(Y)) <= wr``    
-            where ``offset`` denotes the L∞ norm on grid indices.
+            `gridindex(X) - gridindex(Y) <= wr``    
+            where <= is relative to the L∞ norm on grid indices.
         
             Warning
             -------
@@ -391,7 +402,8 @@ class SquareNet:
             a very large search window dilutes the information, since the 
             probability of sampling pairs for a given grid offset decreases.
         
-            Choosing the window size is therefore a tradeoff.
+            Choosing the window size is therefore a tradeoff between macroscopic
+            information and microscopic information
             
         criterion : str, optional
             Method used to define neighborhoods ("rank" or "value").
@@ -431,49 +443,6 @@ class SquareNet:
         arr[nbmap == 0] = -1 #invalid log for 0
         
         printmatrix(arr)
-
-def jitable_fit(points, grid, max_iter):
-    """
-    Pure JAX version of fit.
-    Jitable via jax.jit(jitable_fit).
-
-    Typical usecase:
-    max_iter = 500
-    @jax.jit
-    def jited_fit(points, grid):
-        return jitable_fit(points, grid, max_iter)
-
-    I = 100
-    N = I*I
-    points = samplepoints("holy", size = (N, 2))
-    sn = SquareNet(gridshape = (I, I), backend = "jax")
-    grid = sn.grid
-
-    grid, learning_curve, last_iter = jited_fit(points, grid)
-    updatenet(sn, points, grid, learning_curve, last_iter)
-    
-    Returns
-    -------
-    grid, learning_curve, last_iter
-    """
-    grid, lc_it = carthesian_sort(
-        grid, points,
-        max_iter=max_iter,
-        method="fast",
-        backend="jax",
-        verbose=0,
-    )
-    learning_curve, last_iter = lc_it
-    return grid, learning_curve, last_iter
-
-def updatenet(sqnet, points, grid, learning_curve, last_iter):
-    sqnet.points = points
-    sqnet.grid = grid
-    sqnet.invert_grid = dualgrid(sqnet.grid, sqnet.xp, sqnet.N, sqnet.gridshape, sqnet.D)
-    sqnet.invgridflat = dualgridflat(sqnet.grid, sqnet.xp, sqnet.N)
-    sqnet.learning_curve = list(learning_curve)[:last_iter +1]
-    sqnet.fitted = True
-    sqnet.pointsmaped = sqnet.map(points)
 
 class ConvergenceWarning(UserWarning):
     """Raised when optimization does not converge."""
