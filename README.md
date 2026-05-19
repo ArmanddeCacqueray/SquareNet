@@ -144,7 +144,7 @@ and vectorized tensorial processing instead of irregular kd-tree/voxels data str
 
 
 **License:** MIT | **Author:** [ArmanddeCacqueray](mailto:armanddecacqueray@sfr.fr)
----
+
 <img src="plots/plot_1.png">
 <img src="plots/plot_2.png">
 <img src="plots/plot_3.png">
