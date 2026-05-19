@@ -133,21 +133,20 @@ sn.plot()
 
 ## 📈 When to use SquareNet
 
+<p align="center">
+  <img src="plots/packed.png" width="200" alt="Packed">
+</p>
+
 - **Point cloud processing** — fast spatial queries (neighbors, subsets) with contiguous memory lookup
 and vectorized tensorial processing instead of irregular kd-tree/voxels data structure
 - **Kernel methods** — efficient approximation of large Gram matrices via the grid structure
 - **Deep learning** — convert flat point datasets into tensors ready for CNNs or attention-based models
 
-<p align="center">
-  <img src="plots/packed.png" width="200" alt="Packed">
-</p>
 
+**License:** MIT | **Author:** [ArmanddeCacqueray](mailto:armanddecacqueray@sfr.fr)
 ---
 <img src="plots/plot_1.png">
 <img src="plots/plot_2.png">
 <img src="plots/plot_3.png">
 <img src="plots/plot_7.png">
 <img src="plots/plot_9.png">
-
-**License:** MIT | **Author:** [ArmanddeCacqueray](mailto:armanddecacqueray@sfr.fr)
-```
