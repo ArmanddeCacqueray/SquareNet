@@ -14,9 +14,10 @@
 
 <img src="plots/plot_6.png">
 
-SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: one point, one cell[^1], no overlap, fully invertible.
+SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: one point, one cell, no overlap, fully invertible [^1].
 
-The practical payoff: you replace expensive spatial queries (k-NN, radius search, neighborhood graphs) with plain tensor indexing. Think of it as an alternative to kd-trees, voxelization, rasterization, or graph-based approaches — faster in most cases, and dimension-agnostic.
+The practical payoff: you replace expensive spatial queries (k-NN, radius search, neighborhood graphs) with plain tensor indexing. Think of it as an alternative to kd-trees, voxelization, rasterization, or graph-based approaches, but
+with a regular tensor structure allowing for massive parallelisation.
 
 ✔ Works in any dimension  
 ✔ Handles non-convex geometries and irregular distributions  
