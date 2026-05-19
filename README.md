@@ -7,7 +7,6 @@
 <img src="plots/plot_3.png">
 <img src="plots/plot_7.png">
 <img src="plots/plot_9.png">
-<img src="plots/elephant.png">
 
 ---
 
