@@ -2,14 +2,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/squarenet.svg)](https://pypi.org/project/squarenet/)
 [![Documentation Status](https://readthedocs.org/projects/squarenet/badge/?version=latest)](https://squarenet.readthedocs.io/en/latest/)
 
-<img src="plots/plot_1.png">
-<img src="plots/plot_2.png">
-<img src="plots/plot_3.png">
-<img src="plots/plot_7.png">
-<img src="plots/plot_9.png">
-
----
-
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
 <img src="plots/plot_6.png">
@@ -58,7 +50,8 @@ The idea is simple: loop over 1D Cartesian projections of the point cloud (x, y,
 - **Approximate neighborhood preservation.** Points close in space land close in the grid. Concrete experimental results on a 1M-point 2D dataset (France map, `method='fast'`):
   - Requesting a 11×11 square window ([i-5:i+6, j-5:j+6] = 0.01% of candidates) → recovers ~97% of true nearest neighbors
   - Requesting a 31×31 square window ([i-15:i+16, j-15:j+16] = 0.1% of candidates) → recovers ~99.5%
-- **Volume conservation.** Bijectivity naturaly preserves local volumes up to a local intensity factor.
+- **Volume conservation.** Bijectivity naturally leads to conservation of volumes (or more generally measures: $\int \rho(x)\, dV$ when density rho is not constant). By conservation of volume, it is **not** mean that $$\mathrm{vol}(g(A), g(B), g(C)) = \mathrm{vol}(A, B, C)$$ where $ABC$ is a triangle, since the image of a triangle is generally **not** a triangle anymore.
+It would be equal to $$\mathrm{vol}(\Omega),\qquad \Omega = \{ g(X) \mid X \in ABC \}$$
 
 **What you don't get:**
 
@@ -123,7 +116,7 @@ Working on a subset? `mapidx` converts flat point indices to grid multi-indices 
 
 ```python
 # Select points inside a disk, map their indices to the grid
-sel = np.where(points[:, 0]**2 + points[:, 1]**2 <= 100)[0] #raw indexes
+sel = np.where(points[:, 0]**2 + points[:, 1]**2 <= 100) #raw indexes
 gridsel = sn.mapidx(sel) #grid indexes
 selback = sn.invert_mapidx(np.stack(gridsel, axis=1)) # == sel
 ```
@@ -150,6 +143,11 @@ and vectorized tensorial processing instead of irregular kd-tree/voxels data str
 </p>
 
 ---
+<img src="plots/plot_1.png">
+<img src="plots/plot_2.png">
+<img src="plots/plot_3.png">
+<img src="plots/plot_7.png">
+<img src="plots/plot_9.png">
 
 **License:** MIT | **Author:** [ArmanddeCacqueray](mailto:armanddecacqueray@sfr.fr)
 ```
