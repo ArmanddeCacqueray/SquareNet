@@ -106,7 +106,7 @@ def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, lo
 
         # Single convergence check per chunk
         disorder = _check_convergence(g, dims, circular_loop)
-        learning_curve.append(disorder)
+        learning_curve.extend([disorder] * 10)
         if disorder == 0:
             break
 
@@ -137,7 +137,7 @@ def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, 
 
         # Check convergence only once per chunk
         disorder = _check_convergence(g, dims, circular_loop)
-        learning_curve.append(disorder)
+        learning_curve.extend([disorder] * 10)
         if disorder == 0:
             break
 

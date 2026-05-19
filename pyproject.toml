@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "squarenet"
-version = "1.1.0"
-description = "Sparse local operations for point clouds in any dimension."
+version = "1.1.2"
+description = "Gridification for point clouds in any dimension (fast greedy optimal transport through Cartesian Sort)."
 authors = [{ name = "ArmanddeCacqueray", email = "armanddecacqueray@sfr.fr" }]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,8 +15,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ArmanddeCacqueray/SquareNet"
-Documentation = "https://squarenet.readthedocs.io"
+"Homepage" = "https://github.com/ArmanddeCacqueray/SquareNet"
+"Source" = "https://github.com/ArmanddeCacqueray/SquareNet"
+"Documentation" = "https://squarenet.readthedocs.io"
 PyPI = "https://pypi.org/project/squarenet/"
 
 [tool.setuptools.packages.find]
