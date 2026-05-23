@@ -1,7 +1,7 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArmanddeCacqueray/SquareNet/blob/main/00_getting_started.ipynb)
 [![PyPI version](https://img.shields.io/pypi/v/squarenet.svg)](https://pypi.org/project/squarenet/)
 [![Documentation Status](https://readthedocs.org/projects/squarenet/badge/?version=latest)](https://squarenet.readthedocs.io/en/latest/)
-[![GitHub]([https://img.shields.io/badge/GitHub-Repository?logo=github)](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ArmanddeCacqueray/SquareNet)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository?logo=github)](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ArmanddeCacqueray/SquareNet)
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
