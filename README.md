@@ -17,11 +17,6 @@ with a regular tensor structure allowing for massive parallelisation.
 ✔ Scales to millions of points (seconds, not minutes)  
 ✔ Compatible with PyTorch and JAX  
 
-
-[^1]: Bijectivity requires that the product of the grid shapes equals N. If N is prime or not known
-in advance, pad your dataset with dummy points at ±∞ coordinates — they'll land
-in the grid corners and won't affect the rest of the mapping.
-
 ---
 
 ## 🚀 How it works
@@ -151,3 +146,5 @@ and vectorized tensorial processing instead of irregular kd-tree/voxels data str
 <img src="plots/plot_3.png">
 <img src="plots/plot_7.png">
 <img src="plots/plot_9.png">
+
+[^1]: Bijectivity requires that the product of the grid shapes equals N. If N is prime or not known in advance, pad your dataset with dummy points at ±∞ coordinates — they'll land in the grid corners and won't affect the rest of the mapping.
