@@ -26,7 +26,7 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ```text
 (0.33, 0.12) (1.00, 0.87) (0.83, 0.74) (0.24, 0.57) (0.58, 0.22) ...
-``
+```
 
 ### Gridded: X ↓ Y →
 
