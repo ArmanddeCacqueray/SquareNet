@@ -20,15 +20,10 @@ with a regular tensor structure allowing for massive parallelisation.
 ---
 
 ## Example of gridification
-
-<p align="left">
-  <img src="plots/raw_grided.png" width="400" alt="Raw">
-</p>
-
-<p align="right">
-  <img src="plots/packed.png" width="400" alt="Packed">
-</p>
-
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+  <img src="plots/raw_grided.png" width="400" alt="Raw" style="flex: 1;">
+  <img src="plots/packed.png" width="400" alt="Packed" style="flex: 1;">
+</div>
 ---
 
 ## 🚀 How it works
