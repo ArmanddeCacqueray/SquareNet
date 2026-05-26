@@ -17,6 +17,8 @@ with a regular tensor structure allowing for massive parallelisation.
 ✔ Scales to millions of points (seconds, not minutes)  
 ✔ Compatible with PyTorch and JAX  
 
+---
+
 ## Example of gridification
 
 raw points:
@@ -33,6 +35,7 @@ grided: \
 <p align="center">
   <img src="plots/packed.png" width="400" alt="Packed">
 </p>
+
 ---
 
 ## 🚀 How it works
