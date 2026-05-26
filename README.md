@@ -29,7 +29,7 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ### Gridded: X ↓ Y →
 
-<div style="background:#F8F8F8">
+<div style="background:HTML LightGray">
 
   (0.09, 0.28)      (0.09, 0.75)      (0.12, 0.78)  **(0.24, 0.57)**    (0.04, 0.87)
 
@@ -43,7 +43,7 @@ with a regular tensor structure allowing for massive parallelisation.
 </div>
 
 
-<p align="center">
+<p align="right">
   <img src="plots/packed.png" width="400" alt="Packed">
 </p>
 
