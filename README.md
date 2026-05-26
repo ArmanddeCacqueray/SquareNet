@@ -21,7 +21,6 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ## Example of gridification
 
-## Example of gridification
 
 ### Raw points
 
@@ -39,6 +38,11 @@ X ↓,"(0.09, 0.28) (0.24, 0.57) (0.09, 0.75) (0.12, 0.78) (0.04, 0.87)"
 ,"(0.59, 0.12) (0.58, 0.22) (0.73, 0.27) (0.53, 0.57) (0.65, 0.73)"
 ,"(0.88, 0.09) (0.66, 0.27) (0.75, 0.35) (0.76, 0.52) (0.83, 0.74)"
 ,"(0.89, 0.12) (1.00, 0.74) (0.90, 0.81) (0.93, 0.82) (1.00, 0.87)"
+<p align="center">
+  <img src="plots/packed.png" width="400" alt="Packed">
+</p>
+
+---
 <p align="center">
   <img src="plots/packed.png" width="400" alt="Packed">
 </p>
