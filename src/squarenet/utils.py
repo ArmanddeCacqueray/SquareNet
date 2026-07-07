@@ -43,8 +43,8 @@ def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
     x = cube.astype(float)
     x -= x.mean(axis=0, keepdims=True)
     x /= x.max(axis=0, keepdims=True)
-    x += 0.001 * np.random.randn(1, d)
     x = x.clip(min = -0.999, max = 0.999)
+    x += 0.001 * np.random.randn(1, d)
     log_cube = np.log(np.abs(x))
     low_u, high_u = -2.0, 1000.0
     
@@ -52,7 +52,7 @@ def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
     for _ in range(max_iter):
         p = (low_u + high_u) / 2
         norm_p = np.sum(np.exp(p * log_cube), axis=-1)
-        count = np.sum(norm_p <= 0.99)
+        count = np.sum(norm_p <= 1.01)
 
         if abs(count - n_target) < 1:
             break
@@ -65,7 +65,7 @@ def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
     
     # Initialize stencil with signed infinities and mask target region
     stencil = (2 * cube.astype(dtype) - 1) * np.inf
-    stencil[norm_p <= 0.99] = 0.0
+    stencil[norm_p <= 1.01] = 0.0
     return stencil
 
 def fill_in(data, stencil, xp):
