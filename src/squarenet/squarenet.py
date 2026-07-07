@@ -104,7 +104,7 @@ class SquareNet:
     # Internal utilities
     # ------------------------------------------------------------------
     def _to_backend(self, x):
-        return to_backend(x, backend = self.backend, warnings_ = self.warnings_)
+        return to_backend(x, backend = self.backend)
     
     def _reset_state(self):
         """Reset internal state to initial configuration."""
