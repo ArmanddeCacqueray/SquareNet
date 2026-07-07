@@ -58,7 +58,8 @@ class SquareNet:
         self.max_iter = max_iter
         self.verbose = verbose
         self.backend = backend
-        self.torchdevice = "cpu"
+        self.device = "cpu"
+        self._torchdevice = "cpu"
 
         if backend not in {"numpy", "jax", "torch"}:
             raise ValueError(f"Unknown backend '{backend}' Should be 'numpy' 'torch' or 'jax'")
@@ -67,14 +68,29 @@ class SquareNet:
             self.xp = np
 
         elif backend == "jax":
+            import jax
             import jax.numpy as jnp
+            import shutil
             self.xp = jnp
+            self.device = jax.default_backend()
+            if shutil.which("nvidia-smi") is not None:
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        self._torchdevice = torch.device("cuda")
+                except ImportError:
+                    if warnings_ == True:
+                        warn(
+                            "SquareNet tryed to import pytorch because a GPU was detected."\
+                            "Pytorch was not found so SquareNet will default to cpu for the fit"
+                        )
+
 
         elif backend == "torch":
             import torch
             self.xp = torch
             if torch.cuda.is_available():
-                self.torchdevice = torch.device("cuda")
+                self.device = torch.device("cuda")
 
         self.warnings_ = warnings_
         if stencil is not None:
@@ -88,7 +104,7 @@ class SquareNet:
     # Internal utilities
     # ------------------------------------------------------------------
     def _to_backend(self, x):
-        return to_backend(x, backend = self.backend, device = self.torchdevice, warnings_ = self.warnings_)
+        return to_backend(x, backend = self.backend, device = self.device, warnings_ = self.warnings_)
     
     def _reset_state(self):
         """Reset internal state to initial configuration."""
@@ -96,7 +112,7 @@ class SquareNet:
            self.grid = self.xp.arange(
                 self.N,
                 dtype=self.xp.int32,
-                device=self.torchdevice,
+                device=self.device,
             ).reshape(self.gridshape)
 
         else:
@@ -118,6 +134,7 @@ class SquareNet:
         if isinstance(points, str):
             points = samplepoints(method=points, size=(self.N, self.D))
 
+        points = points.clone() if hasattr(points, "clone") else points.copy()
         points = self._to_backend(points)
         N, D = points.shape
 
@@ -133,7 +150,7 @@ class SquareNet:
 
         return points
     
-    def _make_stencil(self, n_target, dtype=float, max_iter=1000):
+    def _make_stencil(self, n_target, dtype=float, max_iter=100):
         """Create a grid stencil based on a p-holder norm boundary. see utils.make_stencil
         stencil allow to fit n_target points in a grid with shape bigger than n_target"""
         stencil = make_stencil(self.gridshape, n_target, dtype, max_iter)
@@ -164,6 +181,7 @@ class SquareNet:
         Padding is performed such that points in the middle of the grid are true points
         and points in the corner are fictive points with +- inf coordinates, using the stencil.
         """
+        n_target = len(points)
         if self.stencil is None:
             if self.verbose + verbose >= 2:
                 print(
@@ -174,8 +192,14 @@ class SquareNet:
                     "    >>> saved_stencil = sn.stencil\n"
                     "    >>> sn = SquareNet(..., stencil=saved_stencil)\n"
                 )
-            self._make_stencil(n_target=len(points), dtype=points.dtype)
-        
+            self._make_stencil(n_target=n_target, dtype=points.dtype)
+        elif self.xp.isfinite(self.stencil).sum() != self.D*n_target:
+            if self.verbose + verbose >= 2:
+                print(
+                    "\n[SquareNet] Update the stencil to match new number of points...\n"
+                )
+            self._make_stencil(n_target=n_target, dtype=points.dtype)
+
         return fill_in(points, self.stencil, self.xp)
     # ------------------------------------------------------------------
     # Core API
@@ -204,13 +228,24 @@ class SquareNet:
         see ``squarenet.core``
         """
         old_backend = self.backend
-        if self.backend == "torch" and self.torchdevice != "cpu":
-            fit_with_numpy = False 
+        old_device = self.device
+
+        if self._torchdevicedevice != "cpu":
+            #just for the fit, will be updated after
+            self.backend = "torch"
+            self.device = self._torchdevice
         else: 
-            fit_with_numpy = True
             #just for the fit, will be updated after
             self.backend = "numpy"
+            self.device = "cpu"
 
+        true_g = np.array(self.gridshape)
+        true_g = true_g[true_g > 1]
+        D = len(true_g)
+        if D >= 5:
+            #method "fast" is as good as the other methods in 5D and more,
+            #robust and ultimate are too slow anyway in those cases
+            method = "fast"
         max_iter = self.max_iter
         verbose = self.verbose
         def _log(msg):
@@ -222,7 +257,7 @@ class SquareNet:
                 print(f"\n=== {title} ===")
 
         points = self._validate_points(points)
-        self.points = points.clone() if hasattr(points, "clone") else points.copy()
+        grid = self._to_backend(self.grid)
 
         _log("Starting gridification... available method [fast, robust, ultimate]")
         _log(f"selected {method}")
@@ -236,8 +271,8 @@ class SquareNet:
         if method == "ultimate":
             _log(f"(max iter: 2 x {mi} + 4 x {mi} + {mi})")
 
-        self.grid, lc = carthesian_sort(self.grid, points, max_iter=max_iter, method = method,
-                                        backend = self.backend, verbose = self.verbose)
+        grid, lc = carthesian_sort(grid, points, max_iter=max_iter, method = method,
+                                    backend = self.backend, verbose = self.verbose)
 
         # --------------------------------------------------
         # Finalization
@@ -267,10 +302,10 @@ class SquareNet:
                         stacklevel=2,
                     )
         
-        if fit_with_numpy:
-            self.backend = old_backend
-            self.grid = to_backend(self.grid, backend = self.backend, device = self.torchdevice)
-            self.points = to_backend(self.points, backend = self.backend, device = self.torchdevice)
+        self.backend = old_backend
+        self.device = old_device
+        self.grid = self._to_backend(grid)
+        self.points = self._to_backend(points)
         # --------------------------------------------------
         # Update mappings
         # --------------------------------------------------

@@ -8,7 +8,7 @@ def index_identity(shape):
     """index_identy[i, j, k, ...] = [i, j, k, ...]"""
     return np.moveaxis(np.indices(shape), 0, -1)
 
-def make_stencil(gridshape, n_target, dtype=float, max_iter = 1000):
+def make_stencil(gridshape, n_target, dtype=float, max_iter = 100):
     """
     Create a grid stencil based on a p-holder norm boundary.
     Uses binary search to find a smooth convexe subdomain of the hyperrectangular
@@ -52,7 +52,7 @@ def make_stencil(gridshape, n_target, dtype=float, max_iter = 1000):
 
     log_x = np.log(x_abs)
     
-    low_p, high_p = -1.0, 1000.0
+    low_p, high_p = 2.0, 1000.0
     
     for it in range(max_iter):  
         p = (low_p + high_p) / 2.0
@@ -216,50 +216,78 @@ def project(gridpoints, feature_axes=(0, 1), index=0):
 
 def from_backend(x):
     """
-    Convert torch/jax/numpy array to numpy safely.
+    Safely convert Torch, JAX, or array-like objects back to Numpy.
     """
+    # 1. Already a Numpy array
     if isinstance(x, np.ndarray):
         return x
 
-    # torch
+    # 2. PyTorch tensor 
     if hasattr(x, "detach"):
         return x.detach().cpu().numpy()
 
-    # jax
-    if hasattr(x, "__array__"):
-        return np.asarray(x)
-
+    # 3. JAX arrays or any object with __array__ protocol (Pandas, etc.)
     return np.asarray(x)
 
-def to_backend(x, backend="numpy", device = "cpu", warnings_ = True):
+def to_backend(x, backend="numpy", device="cpu", warnings_=True):
     """
-    Convert numpy array to target backend.
+    Convert arrays/tensors between Numpy, Torch, and JAX.
+    Utilizes DLPack for zero-copy transfers across frameworks when possible.
     """
+    # Identify input framework without heavy imports
+    in_type = type(x).__module__.split('.')[0]
+
+    # ---------------------------------------------------------
+    # 1. Target: NUMPY
+    # ---------------------------------------------------------
     if backend == "numpy":
-        return np.asarray(x)
+        return from_backend(x)
 
-    if backend == "torch":
+    # ---------------------------------------------------------
+    # 2. Target: TORCH
+    # ---------------------------------------------------------
+    elif backend == "torch":
         import torch
-        device = torch.device(device)
-        x_device = getattr(x, "device", None)
-        if (
-            warnings_
-            and x_device is not None
-            and hasattr(x_device, "type")
-            and x_device.type == "cpu"
-            and device.type != "cpu"
-        ):
-            warn(
-                "Downgrading tensor as initial device was GPU but asked device is CPU"
-            )
+        tgt_dev = torch.device(device)
+        
+        if in_type == "torch":
+            if warnings_ and x.device.type != "cpu" and tgt_dev.type == "cpu":
+                warn("Downgrading tensor: initial device was GPU but asked for CPU.")
+            return x.to(tgt_dev)
+            
+        elif in_type in ["jax", "jaxlib"]:
+            # Zero-copy JAX to Torch via DLPack
+            return torch.from_dlpack(x).to(tgt_dev)
+            
+        return torch.as_tensor(x, device=tgt_dev)
 
-        return torch.as_tensor(x, device=device)
-
-    if backend == "jax":
+    # ---------------------------------------------------------
+    # 3. Target: JAX
+    # ---------------------------------------------------------
+    elif backend == "jax":
+        import jax
         import jax.numpy as jnp
-        return jnp.asarray(x)
+        
+        # JAX uses "gpu" instead of "cuda"
+        device = "cpu" if "cpu" in str(device) else "gpu"
+        try:
+            tgt_dev = jax.devices(device)[0]
+        except RuntimeError:
+            tgt_dev = None
 
-    raise ValueError(f"Unknown backend: {backend}")
+        if in_type == "torch":
+            import torch.utils.dlpack
+            # DLPack requires contiguous memory
+            x = x if x.is_contiguous() else x.contiguous()
+            j_arr = jax.dlpack.from_dlpack(torch.utils.dlpack.to_dlpack(x))
+            return jax.device_put(j_arr, tgt_dev) if tgt_dev else j_arr
+            
+        elif in_type in ["jax", "jaxlib"]:
+            return jax.device_put(x, tgt_dev) if tgt_dev else x
+            
+        return jax.device_put(x, tgt_dev) if tgt_dev else jnp.asarray(x)
+
+    raise ValueError(f"Unknown backend: '{backend}'. Expected 'numpy', 'torch', or 'jax'.")
 
 def progress_bar(it, total, bar_length=30):
     progress = it / total

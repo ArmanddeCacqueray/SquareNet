@@ -14,14 +14,19 @@ def neighbormap(grided_points, mapidx, criterion = "rank", thresholdcut = 1,
     d = len(gpts.shape) - 1
     wr = windowradius
     ws = 2*wr+1
+    N = np.prod(gpts.shape[:-1])
+    D = gpts.shape[-1]
 
     selection = None
 
-    if np.prod(gpts.shape)*(ws**2) >= sample_size:
-        N = np.prod(gpts.shape[:-1])
+    if N*D*(ws**2) >= sample_size:
         sample_size_x = min(sample_size//(ws**2), N)
         selection = np.random.choice(N, replace = False, size = sample_size_x)
         selection = mapidx(selection)
+    else:
+        selection = mapidx(np.arange(N))
+    mask = np.isfinite(grided_points[selection]).all(axis=-1)
+    selection = tuple(dim_coords[mask] for dim_coords in selection)
         
     pad_width = [(0, 0)]*(d+1)
     for gax in projection:
@@ -38,9 +43,6 @@ def neighbormap(grided_points, mapidx, criterion = "rank", thresholdcut = 1,
         window_shape=(ws, ws),
         axis=projection
     )
-
-
-
 
     dists = kernel(gpts[selection], gview[selection])
 
