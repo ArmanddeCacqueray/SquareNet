@@ -309,11 +309,14 @@ def _build_animation(grid, cfg):
     bg_artists = []
     for ax in axes:
         if id(ax) not in seen_axes:
+            color = "lightgrey"
+            if (style == "scatter") and (not is_3d):
+                color = "black"
             seen_axes.append(id(ax))
             bg_artists.append(
                 ax.scatter(
                     full0[:, 0], full0[:, 1],
-                    c="lightgrey", s=pt_size, linewidths=0
+                    c=color, s=pt_size, linewidths=0
                 )
             )
 

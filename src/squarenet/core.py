@@ -2,7 +2,6 @@ from importlib import import_module
 
 _BACKENDS = {
     "numpy": ".optim.core_numpy",
-    "jax": ".optim.core_jax",
     "torch": ".optim.core_torch",
 }
 
@@ -29,7 +28,7 @@ def carthesian_sort(
     Supported:
     ----
     method [fast, robust, ultimate]
-    backend [numpy, jax, torch]
+    backend [numpy, torch]
 
 
     Goal

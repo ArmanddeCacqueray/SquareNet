@@ -7,7 +7,7 @@
 
 <img src="plots/plot_6.png">
 
-SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: one point, one cell, no overlap, fully invertible [^1].
+SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: one point, one cell, no overlap, fully invertible.
 
 The practical payoff: you replace expensive spatial queries (k-NN, radius search, neighborhood graphs) with plain tensor indexing. Think of it as an alternative to kd-trees, voxelization, rasterization, or graph-based approaches, but
 with a regular tensor structure allowing for massive parallelisation.
@@ -16,15 +16,13 @@ with a regular tensor structure allowing for massive parallelisation.
 ✔ Handles non-convex geometries and irregular distributions  
 ✔ Scales to millions of points (seconds, not minutes)  
 ✔ Compatible with PyTorch and JAX  
+✔ Native pading for mismatch between number of grid slots and number of points (since version 1.2)
 
 ---
 
 ## Example of gridification
 
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
-  <img src="plots/raw_grided2.png" width="400" alt="Raw" style="flex: 1;">
-  <img src="plots/packed.png" width="400" alt="Packed" style="flex: 1;">
-</div>
+<img src="plots/raw_grided2.png" width="400" alt="Raw" style="flex: 1;">
 
 ---
 
@@ -152,5 +150,3 @@ and vectorized tensorial processing instead of irregular kd-tree/voxels data str
 <img src="plots/plot_3.png">
 <img src="plots/plot_7.png">
 <img src="plots/plot_9.png">
-
-[^1]: Bijectivity requires that the product of the grid shapes equals N. If N is prime or not known in advance, pad your dataset with dummy points at ±∞ coordinates — they'll land in the grid corners and won't affect the rest of the mapping.

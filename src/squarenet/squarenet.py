@@ -5,8 +5,7 @@ from .core import carthesian_sort
 from .artist import sqplot, default_config
 from .sampler import samplepoints
 from .neighbormap import neighbormap
-from .utils import dualgrid, dualgridflat, from_backend, to_backend, printmatrix
-
+from .utils import make_stencil, fill_in, dualgrid, dualgridflat, from_backend, to_backend, printmatrix
 
 class SquareNet:
     """
@@ -32,6 +31,8 @@ class SquareNet:
         perfectly ordered at the end of the process.
     backend : {"numpy", "torch" or "jax"}, default="numpy"
         input and output backend.
+    stencil : array of shape (n, d), optional:
+        precomputed stencil to allow fiting n_target < ngrid points
 
     Attributes
     ----------
@@ -50,14 +51,14 @@ class SquareNet:
     """
 
     def __init__(self, gridshape, max_iter = 1_000, warnings_=True, 
-                 verbose = 2, backend = "numpy", device = "cpu"):
+                 verbose = 2, backend = "numpy", stencil = None):
         self.gridshape = tuple(gridshape)
         self.D = len(self.gridshape)
         self.N = int(np.prod(self.gridshape))
         self.max_iter = max_iter
         self.verbose = verbose
         self.backend = backend
-        self.device = device
+        self.torchdevice = "cpu"
 
         if backend not in {"numpy", "jax", "torch"}:
             raise ValueError(f"Unknown backend '{backend}' Should be 'numpy' 'torch' or 'jax'")
@@ -72,18 +73,22 @@ class SquareNet:
         elif backend == "torch":
             import torch
             self.xp = torch
+            if torch.cuda.is_available():
+                self.torchdevice = torch.device("cuda")
 
         self.warnings_ = warnings_
-
+        if stencil is not None:
+            self.stencil = self._to_backend(stencil)
+        else:
+            self.stencil = None
         self.plot_config = default_config()
-
         self._reset_state()
 
     # ------------------------------------------------------------------
     # Internal utilities
     # ------------------------------------------------------------------
-    def to_backend(self, x):
-        return to_backend(x, backend = self.backend, device = self.device, warnings_ = self.warnings_)
+    def _to_backend(self, x):
+        return to_backend(x, backend = self.backend, device = self.torchdevice, warnings_ = self.warnings_)
     
     def _reset_state(self):
         """Reset internal state to initial configuration."""
@@ -91,7 +96,7 @@ class SquareNet:
            self.grid = self.xp.arange(
                 self.N,
                 dtype=self.xp.int32,
-                device=self.device,
+                device=self.torchdevice,
             ).reshape(self.gridshape)
 
         else:
@@ -113,13 +118,13 @@ class SquareNet:
         if isinstance(points, str):
             points = samplepoints(method=points, size=(self.N, self.D))
 
-        points = self.to_backend(points)
+        points = self._to_backend(points)
         N, D = points.shape
 
         assert N == self.N, (
             f"Input points ({N}) must match grid size ({self.N})."
-            "For injective gridification, explicitly add fictive points with +- infinite coordinates",
-            "Which will then be placed in the corners of the grid"
+            "SquareNet support injective gridification by padding points with +-inf coordinates"
+            "but it has to be done explicitely, see self.pad"
         )
         assert D == self.D, (
             f"Input dimension ({D}) must match D={self.D}. "
@@ -127,11 +132,55 @@ class SquareNet:
         )
 
         return points
+    
+    def _make_stencil(self, n_target, dtype=float, max_iter=1000):
+        """Create a grid stencil based on a p-holder norm boundary. see utils.make_stencil
+        stencil allow to fit n_target points in a grid with shape bigger than n_target"""
+        stencil = make_stencil(self.gridshape, n_target, dtype, max_iter)
+        self.stencil = self._to_backend(stencil)
 
+    def pad(self, points, verbose = 1):
+        """
+        Pad input points to the number of slots of the grid.
+        Used if n_points < n_grid for injective gridification.
+
+        Parameters
+        ----------
+        self.stencil : (ndarray of shape (n_grid, d))
+            (A pre-computed stencil containing 0.0 at allowed positions.)
+        points : ndarray of shape (n_points, d)
+            The input data to map into the grid.
+        verbose : allow to shut up a warning that suggest saving results for 
+            the next time
+
+        Returns
+        -------
+        ndarray of shape (n_grid, d)
+            The populated array containing the input data at allowed positions 
+            and signed infinities elsewhere.
+        
+        Note
+        ----
+        Padding is performed such that points in the middle of the grid are true points
+        and points in the corner are fictive points with +- inf coordinates, using the stencil.
+        """
+        if self.stencil is None:
+            if self.verbose + verbose >= 2:
+                print(
+                    "\n[SquareNet] Computing a stencil matching the number of points...\n"
+                    "Note: It might be an expensive operation, but the same \n"
+                    "stencil will work for same gridshape and number of points \n"
+                    " -> Consider saving and reusing it for the next time:\n"
+                    "    >>> saved_stencil = sn.stencil\n"
+                    "    >>> sn = SquareNet(..., stencil=saved_stencil)\n"
+                )
+            self._make_stencil(n_target=len(points), dtype=points.dtype)
+        
+        return fill_in(points, self.stencil, self.xp)
     # ------------------------------------------------------------------
     # Core API
     # ------------------------------------------------------------------
-    def fit(self, points, method = "fast", fit_with_numpy = False):
+    def fit(self, points, method = "fast"):
         """
         Fit the grid to a point cloud.
 
@@ -147,13 +196,6 @@ class SquareNet:
             but will give the best results among the
             three methods.
 
-        fit_with_numpy :
-            wether to apply conversion to numpy
-            (just for the fit) and fit with numpy method.
-            Might be faster, always consider it as an option.
-            Default is to fit on the backend (and device)
-            given at init e.g. numpy, torch or jax.
-
         Returns 
         -------
         None
@@ -162,7 +204,10 @@ class SquareNet:
         see ``squarenet.core``
         """
         old_backend = self.backend
-        if fit_with_numpy:
+        if self.backend == "torch" and self.torchdevice != "cpu":
+            fit_with_numpy = False 
+        else: 
+            fit_with_numpy = True
             #just for the fit, will be updated after
             self.backend = "numpy"
 
@@ -224,8 +269,8 @@ class SquareNet:
         
         if fit_with_numpy:
             self.backend = old_backend
-            self.grid = to_backend(self.grid, backend = self.backend, device = self.device)
-            self.points = to_backend(self.points, backend = self.backend, device = self.device)
+            self.grid = to_backend(self.grid, backend = self.backend, device = self.torchdevice)
+            self.points = to_backend(self.points, backend = self.backend, device = self.torchdevice)
         # --------------------------------------------------
         # Update mappings
         # --------------------------------------------------
@@ -422,10 +467,14 @@ class SquareNet:
         
         see ``squarenet.neighbormap``
         """
+        numpy_invgrid = from_backend(self.invert_grid)
+        def numpy_mapidx(index):
+            coords = numpy_invgrid[index]
+            return tuple(coords.T)
 
         nbmap = neighbormap(
             from_backend(self.pointsmaped),
-            self.mapidx,
+            numpy_mapidx,
             sample_size = max_sample_size,
             windowradius = max_window_size//2,
             criterion=criterion,

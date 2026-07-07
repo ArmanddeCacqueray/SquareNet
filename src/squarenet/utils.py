@@ -1,9 +1,106 @@
 import numpy as np
 from warnings import warn
 
+
 def index_identity(shape):
      #index_identity[i,j,k] = [i, j, k]
      return np.moveaxis(np.indices(shape), 0, -1)
+
+def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
+    """
+    Create a grid stencil based on a p-holder norm boundary.
+
+    Uses binary search to find a smooth convexe subdomain of the hyperrectangular
+    lattice with given shape that encloses exactly `n_target` points. Invalid positions 
+    are filled with +-inf coordinates, while  allowed positions are initialized to zero.
+
+    Parameters
+    ----------
+    gridshape : tuple of int
+        The shape of the target grid.
+    n_target : int
+        The exact number of allowed (finite) positions required.
+    dtype : data-type, optional
+        The desired data-type for the stencil array (default is float).
+    max_iter : int, optional
+        Maximum number of iterations for the binary search (default is 1000).
+
+    Returns
+    -------
+    None : update self.stencil, ndarray of shape (n, d)
+        A stencil prefilled with 0.0 at allowed positions and signed infinity 
+        at forbidden positions.
+    """
+    d = len(gridshape)
+    n = np.prod(gridshape)
+    assert n_target <= n, "Target size exceeds total grid capacity."
+    
+    # Generate and center coordinates
+    cube = index_identity(gridshape).reshape(-1, d)
+    cube = 2 * cube - cube.max(axis=0, keepdims=True)
+    
+    # Normalize with symmetry breaking for the norm search
+    x = cube.astype(float)
+    x -= x.mean(axis=0, keepdims=True)
+    x /= x.max(axis=0, keepdims=True)
+    x += 0.001 * np.random.randn(1, d)
+    x = x.clip(min = -0.999, max = 0.999)
+    log_cube = np.log(np.abs(x))
+    low_u, high_u = -2.0, 1000.0
+    
+    # Binary search for the p-norm threshold
+    for _ in range(max_iter):
+        p = (low_u + high_u) / 2
+        norm_p = np.sum(np.exp(p * log_cube), axis=-1)
+        count = np.sum(norm_p <= 0.99)
+
+        if abs(count - n_target) < 1:
+            break
+        if count > n_target:
+            high_u = p
+        else:
+            low_u = p
+    else:
+        raise ValueError("Binary search did not converge within max_iter.")
+    
+    # Initialize stencil with signed infinities and mask target region
+    stencil = (2 * cube.astype(dtype) - 1) * np.inf
+    stencil[norm_p <= 0.99] = 0.0
+    return stencil
+
+def fill_in(data, stencil, xp):
+    assert data.ndim == 2, f"Data must be (n, d), got shape {data.shape}"
+    assert stencil.ndim == 2, f"Stencil must be (n, d), got shape {stencil.shape}"
+    
+    n_target, d = data.shape
+    
+    assert stencil.shape[1] == d, (
+        f"Dimension mismatch: data features ({d}) do not match stencil features ({stencil.shape[1]})."
+    )
+ 
+    if xp.__name__ == "torch":
+        fill_mask = xp.isfinite(stencil).all(dim=-1)
+        n_slots = fill_mask.sum().item() 
+    else:
+        fill_mask = xp.isfinite(stencil).all(axis=-1)
+        n_slots = int(fill_mask.sum()) 
+    
+    assert n_slots == n_target, (
+        f"Capacity mismatch: data contains {n_target} points, but stencil has {n_slots} allowed slots."
+    )
+    
+    if xp.__name__ == "torch":
+        cube_data = stencil.clone()
+        cube_data[fill_mask] = data
+        
+    elif "jax" in xp.__name__:
+        cube_data = stencil.at[fill_mask].set(data)
+        
+    else:
+        cube_data = stencil.copy()
+        cube_data[fill_mask] = data
+        
+    return cube_data
 
 def dualgrid(grid, xp, N, IJ, D):
     # torch
