@@ -72,7 +72,6 @@ class SquareNet:
             import jax.numpy as jnp
             import shutil
             self.xp = jnp
-            self.device = jax.default_backend()
             if shutil.which("nvidia-smi") is not None:
                 try:
                     import torch
@@ -112,7 +111,7 @@ class SquareNet:
            self.grid = self.xp.arange(
                 self.N,
                 dtype=self.xp.int32,
-                device=self.device,
+                device=self._torchdevice,
             ).reshape(self.gridshape)
 
         else:
