@@ -229,7 +229,7 @@ def from_backend(x):
     # 3. JAX arrays or any object with __array__ protocol (Pandas, etc.)
     return np.asarray(x)
 
-def to_backend(x, backend="numpy", device="cpu", warnings_=True):
+def to_backend(x, backend="numpy", device="auto", warnings_=True):
     """
     Convert arrays/tensors between Numpy, Torch, and JAX.
     Utilizes DLPack for zero-copy transfers across frameworks when possible.
@@ -248,16 +248,27 @@ def to_backend(x, backend="numpy", device="cpu", warnings_=True):
     # ---------------------------------------------------------
     elif backend == "torch":
         import torch
-        tgt_dev = torch.device(device)
+        
+        # Gestion du device 'auto'
+        if device == "auto":
+            if in_type == "torch":
+                tgt_dev = x.device
+            else:
+                # Automatiquement CUDA si dispo, sinon CPU
+                tgt_dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            tgt_dev = torch.device(device)
         
         if in_type == "torch":
-            if warnings_ and x.device.type != "cpu" and tgt_dev.type == "cpu":
+            if warnings_ and device != "auto" and x.device.type != "cpu" and tgt_dev.type == "cpu":
                 warn("Downgrading tensor: initial device was GPU but asked for CPU.")
             return x.to(tgt_dev)
             
         elif in_type in ["jax", "jaxlib"]:
             # Zero-copy JAX to Torch via DLPack
-            return torch.from_dlpack(x).to(tgt_dev)
+            t = torch.from_dlpack(x)
+            # En mode auto, on conserve l'appareil d'origine préservé par DLPack
+            return t if device == "auto" else t.to(tgt_dev)
             
         return torch.as_tensor(x, device=tgt_dev)
 
@@ -268,12 +279,15 @@ def to_backend(x, backend="numpy", device="cpu", warnings_=True):
         import jax
         import jax.numpy as jnp
         
-        # JAX uses "gpu" instead of "cuda"
-        device = "cpu" if "cpu" in str(device) else "gpu"
-        try:
-            tgt_dev = jax.devices(device)[0]
-        except RuntimeError:
-            tgt_dev = None
+        # Gestion du device 'auto'
+        if device == "auto":
+            tgt_dev = None # JAX et DLPack gèrent automatiquement le placement optimal/par défaut
+        else:
+            dev_str = "cpu" if "cpu" in str(device) else "gpu"
+            try:
+                tgt_dev = jax.devices(dev_str)[0]
+            except RuntimeError:
+                tgt_dev = None
 
         if in_type == "torch":
             import torch.utils.dlpack

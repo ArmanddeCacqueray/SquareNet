@@ -492,6 +492,12 @@ def sqplot(grid, verbose, style="checkerboard", animate=False,
                         print(f"ffmpeg unavailable. Npoints = {rounded} and style is 'scatter' -> could take 1/2 minutes")   
                     else:
                         print(f"ffmpeg unavailable. Npoints = {rounded} -> could take 20/30 seconds")
+            if has_ffmpeg:
+                # On force le codec h264 qui est lu partout
+                from matplotlib.animation import FFMpegWriter
+                writer = FFMpegWriter(fps=full_cfg["fps"], codec="h264", bitrate=-1)
+            else:
+                writer = "pillow"
             ani.save(save_path, writer=writer, fps=full_cfg["fps"])
         else:
             if cfg["show"]:
