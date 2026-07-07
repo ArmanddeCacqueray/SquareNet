@@ -2,16 +2,17 @@ import numpy as np
 from warnings import warn
 
 
-def index_identity(shape):
-     #index_identity[i,j,k] = [i, j, k]
-     return np.moveaxis(np.indices(shape), 0, -1)
+import numpy as np
 
-def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
+def index_identity(shape):
+    """index_identy[i, j, k, ...] = [i, j, k, ...]"""
+    return np.moveaxis(np.indices(shape), 0, -1)
+
+def make_stencil(gridshape, n_target, dtype=float, max_iter = 1000):
     """
     Create a grid stencil based on a p-holder norm boundary.
-
     Uses binary search to find a smooth convexe subdomain of the hyperrectangular
-    lattice with given shape that encloses exactly `n_target` points. Invalid positions 
+    lattice with given shape that encloses exactly `n_target` points. Invalid positions
     are filled with +-inf coordinates, while  allowed positions are initialized to zero.
 
     Parameters
@@ -27,45 +28,55 @@ def make_stencil(gridshape, n_target, dtype=float, max_iter=1000):
 
     Returns
     -------
-    None : update self.stencil, ndarray of shape (n, d)
-        A stencil prefilled with 0.0 at allowed positions and signed infinity 
-        at forbidden positions.
-    """
+    stencil: ndarray of shape (n, d)
+        A stencil prefilled with 0.0 at allowed positions and signed infinity
+       at forbidden positions.
+    """ 
     d = len(gridshape)
     n = np.prod(gridshape)
     assert n_target <= n, "Target size exceeds total grid capacity."
     
-    # Generate and center coordinates
+    if n_target == 0:
+        return (np.ones(gridshape) * np.inf).astype(dtype).reshape(-1, d)
+
     cube = index_identity(gridshape).reshape(-1, d)
     cube = 2 * cube - cube.max(axis=0, keepdims=True)
-    
-    # Normalize with symmetry breaking for the norm search
-    x = cube.astype(float)
-    x -= x.mean(axis=0, keepdims=True)
-    x /= x.max(axis=0, keepdims=True)
-    x = x.clip(min = -0.999, max = 0.999)
-    x += 0.001 * np.random.randn(1, d)
-    log_cube = np.log(np.abs(x))
-    low_u, high_u = -2.0, 1000.0
-    
-    # Binary search for the p-norm threshold
-    for _ in range(max_iter):
-        p = (low_u + high_u) / 2
-        norm_p = np.sum(np.exp(p * log_cube), axis=-1)
-        count = np.sum(norm_p <= 1.01)
 
-        if abs(count - n_target) < 1:
-            break
-        if count > n_target:
-            high_u = p
-        else:
-            low_u = p
-    else:
-        raise ValueError("Binary search did not converge within max_iter.")
+    x = cube.astype(float)
+    x_max = x.max(axis=0, keepdims=True)
+    x_max[x_max == 0] = 1.0 
+    x /= (x_max + 1e-4)
     
-    # Initialize stencil with signed infinities and mask target region
+    perturbation = 1e-6 * np.arange(1, d + 1) / d
+    x_abs = np.abs(x + perturbation)
+
+    log_x = np.log(x_abs)
+    
+    low_p, high_p = -1.0, 1000.0
+    
+    for it in range(max_iter):  
+        p = (low_p + high_p) / 2.0
+        norm_p = np.sum(np.exp(log_x * p), axis=-1)
+        count = np.sum(norm_p <= 1.0)
+
+        if count == n_target:
+            low_p = p
+            high_p = p
+            break  
+        elif count > n_target:
+            high_p = p
+        else:
+            low_p = p
+
+    final_p = (low_p + high_p) / 2.0
+    scores = np.sum(x_abs ** final_p, axis=-1)
+    
+    sorted_indices = np.argsort(scores)
+    allowed_indices = sorted_indices[:n_target]
+    
     stencil = (2 * cube.astype(dtype) - 1) * np.inf
-    stencil[norm_p <= 1.01] = 0.0
+    stencil[allowed_indices] = 0.0
+    
     return stencil
 
 def fill_in(data, stencil, xp):
