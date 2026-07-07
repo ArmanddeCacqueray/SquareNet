@@ -230,7 +230,7 @@ class SquareNet:
         old_backend = self.backend
         old_device = self.device
 
-        if self._torchdevicedevice != "cpu":
+        if self._torchdevice != "cpu":
             #just for the fit, will be updated after
             self.backend = "torch"
             self.device = self._torchdevice
