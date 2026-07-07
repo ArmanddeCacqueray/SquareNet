@@ -493,12 +493,15 @@ def sqplot(grid, verbose, style="checkerboard", animate=False,
                     else:
                         print(f"ffmpeg unavailable. Npoints = {rounded} -> could take 20/30 seconds")
             if has_ffmpeg:
-                # On force le codec h264 qui est lu partout
                 from matplotlib.animation import FFMpegWriter
+                # On passe le fps ICI, lors de la création de l'objet
                 writer = FFMpegWriter(fps=full_cfg["fps"], codec="h264", bitrate=-1)
+                # Et on ne le passe PLUS dans .save()
+                ani.save(save_path, writer=writer)
             else:
                 writer = "pillow"
-            ani.save(save_path, writer=writer, fps=full_cfg["fps"])
+                # Avec le string "pillow", on doit passer le fps dans .save()
+                ani.save(save_path, writer=writer, fps=full_cfg["fps"])
         else:
             if cfg["show"]:
                 plt.show()

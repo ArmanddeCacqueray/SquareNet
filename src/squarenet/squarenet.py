@@ -5,7 +5,8 @@ from .core import carthesian_sort
 from .artist import sqplot, default_config
 from .sampler import samplepoints
 from .neighbormap import neighbormap
-from .utils import make_stencil, fill_in, dualgrid, dualgridflat, from_backend, to_backend, printmatrix
+from .utils import make_stencil, fill_in, dualgrid, dualgridflat, printmatrix
+from .backends import from_backend, to_backend
 
 class SquareNet:
     """
@@ -58,7 +59,6 @@ class SquareNet:
         self.max_iter = max_iter
         self.verbose = verbose
         self.backend = backend
-        self.device = "cpu"
         self._torchdevice = "cpu"
 
         if backend not in {"numpy", "jax", "torch"}:
@@ -90,7 +90,7 @@ class SquareNet:
             import torch
             self.xp = torch
             if torch.cuda.is_available():
-                self.device = torch.device("cuda")
+                self._torchdevice = torch.device("cuda")
 
         self.warnings_ = warnings_
         if stencil is not None:
@@ -104,7 +104,7 @@ class SquareNet:
     # Internal utilities
     # ------------------------------------------------------------------
     def _to_backend(self, x):
-        return to_backend(x, backend = self.backend, device = self.device, warnings_ = self.warnings_)
+        return to_backend(x, backend = self.backend, warnings_ = self.warnings_)
     
     def _reset_state(self):
         """Reset internal state to initial configuration."""
@@ -228,16 +228,12 @@ class SquareNet:
         see ``squarenet.core``
         """
         old_backend = self.backend
-        old_device = self.device
-
         if self._torchdevice != "cpu":
-            #just for the fit, will be updated after
+            #We will fit on GPU with torch
             self.backend = "torch"
-            self.device = self._torchdevice
         else: 
-            #just for the fit, will be updated after
+            #We will fit on CPU with numpy
             self.backend = "numpy"
-            self.device = "cpu"
 
         true_g = np.array(self.gridshape)
         true_g = true_g[true_g > 1]
@@ -303,7 +299,6 @@ class SquareNet:
                     )
         
         self.backend = old_backend
-        self.device = old_device
         self.grid = self._to_backend(grid)
         self.points = self._to_backend(points)
         # --------------------------------------------------
