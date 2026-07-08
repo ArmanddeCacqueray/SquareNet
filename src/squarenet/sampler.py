@@ -43,7 +43,7 @@ def place_at(points, position=(0, 0)):
     points += np.array(position)[None, :]
     return points
 
-def samplepoints(method="gaussian", size=(1_000_000, 2), plot_points=False):
+def samplepoints(method="gaussian", size=(1_000_000, 2), plot_points=True):
     """
     Generate point clouds using various sampling strategies.
 

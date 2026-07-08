@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def from_backend(x):
     """Convert any supported array/tensor to a NumPy ndarray."""
     if isinstance(x, np.ndarray):
@@ -10,19 +9,16 @@ def from_backend(x):
         return x.detach().cpu().numpy()
     return np.asarray(x)
 
-
-def get_backend_device(x):
-    """Return (backend, device) for a supported array."""
+def get_backend(x):
+    """Return backend for a supported array."""
     if isinstance(x, np.ndarray):
-        return "numpy", "cpu"
+        return "numpy"
     module = type(x).__module__.split(".")[0]
     if module == "torch":
-        return "torch", str(x.device)
+        return "torch"
     if module in ("jax", "jaxlib"):
-        dev = getattr(x, "device", None)
-        return "jax", str(dev) if dev is not None else "unknown"
-    return "unknown", None
-
+        return "jax"
+    return "unknown"
 
 def to_backend(x, backend="numpy"):
     """
@@ -33,11 +29,15 @@ def to_backend(x, backend="numpy"):
     - If backend already match, return x unchanged.
     - Otherwise always convert through NumPy.
     """
-    current_backend, current_device = get_backend_device(x)
+    current_backend = get_backend(x)
     # ------------------------------------------------------------------
-    # Already on requested backend/device
+    # Already on requested backend
     # ------------------------------------------------------------------
     if backend == current_backend:
+        if backend == "torch":
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            return torch.as_tensor(x, device=torch.device(device))
         return x
     # ------------------------------------------------------------------
     # Convert through NumPy
@@ -54,7 +54,7 @@ def to_backend(x, backend="numpy"):
     if backend == "torch":
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        return torch.as_tensor(x, device=torch.device(device))
+        return torch.as_tensor(arr, device=torch.device(device))
     # ------------------------------------------------------------------
     # JAX
     # ------------------------------------------------------------------
@@ -62,6 +62,9 @@ def to_backend(x, backend="numpy"):
         import jax.numpy as jnp
         out = jnp.asarray(arr)
         return out
+    # ------------------------------------------------------------------
+    # Unknown
+    # ------------------------------------------------------------------
     raise ValueError(
         f"Unknown backend '{backend}'. Expected 'numpy', 'torch' or 'jax'."
     )

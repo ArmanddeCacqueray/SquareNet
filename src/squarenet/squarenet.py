@@ -1,7 +1,7 @@
 import numpy as np
 from warnings import warn
 
-from .core import carthesian_sort
+from .core import cartesian_sort
 from .artist import sqplot, default_config
 from .sampler import samplepoints
 from .neighbormap import neighbormap
@@ -32,8 +32,17 @@ class SquareNet:
         perfectly ordered at the end of the process.
     backend : {"numpy", "torch" or "jax"}, default="numpy"
         input and output backend.
-    stencil : array of shape (n, d), optional:
-        precomputed stencil to allow fiting n_target < ngrid points
+    cuda : bool, default = True
+        If True, SquareNet will search for a cuda GPU and a pytorch 
+        installation. If both are found, SquareNet will fit on GPU
+        with pytorch, else SquareNet will fit on CPU with numpy. 
+        Note that the cuda flag affect ONLY the fit method, any
+        other method is performed natively on the backend specified
+        at init i.e. numpy torch or jax.
+    
+    plot_config : 
+        python fonction that return a valid configuration for artist.sqplot
+        many plot options are available.
 
     Attributes
     ----------
@@ -52,7 +61,7 @@ class SquareNet:
     """
 
     def __init__(self, gridshape, max_iter = 1_000, warnings_=True, 
-                 verbose = 2, backend = "numpy", stencil = None):
+                 verbose = 2, backend = "numpy", cuda = True, plot_config = None):
         self.gridshape = tuple(gridshape)
         self.D = len(self.gridshape)
         self.N = int(np.prod(self.gridshape))
@@ -68,10 +77,15 @@ class SquareNet:
             self.xp = np
 
         elif backend == "jax":
-            import jax
             import jax.numpy as jnp
-            import shutil
             self.xp = jnp
+
+        elif backend == "torch":
+            import torch
+            self.xp = torch
+        
+        if cuda:
+            import shutil
             if shutil.which("nvidia-smi") is not None:
                 try:
                     import torch
@@ -81,23 +95,14 @@ class SquareNet:
                     if warnings_ == True:
                         warn(
                             "SquareNet tryed to import pytorch because a GPU was detected."\
-                            "Pytorch was not found so SquareNet will default to cpu for the fit"
+                            "Pytorch was not found so SquareNet.fit will default to CPU"
                         )
 
-
-        elif backend == "torch":
-            import torch
-            self.xp = torch
-            if torch.cuda.is_available():
-                self._torchdevice = torch.device("cuda")
-
         self.warnings_ = warnings_
-        if stencil is not None:
-            self.stencil = self._to_backend(stencil)
-        else:
-            self.stencil = None
-        self.plot_config = default_config()
+        if plot_config is None:
+            self.plot_config = default_config
         self._reset_state()
+        self._make_stencil()
 
     # ------------------------------------------------------------------
     # Internal utilities
@@ -149,25 +154,21 @@ class SquareNet:
 
         return points
     
-    def _make_stencil(self, n_target, dtype=float, max_iter=100):
-        """Create a grid stencil based on a p-holder norm boundary. see utils.make_stencil
+    def _make_stencil(self,dtype=float):
+        """Prepare a grid stencil based on a norm boundary. see utils.make_stencil
         stencil allow to fit n_target points in a grid with shape bigger than n_target"""
-        stencil = make_stencil(self.gridshape, n_target, dtype, max_iter)
-        self.stencil = self._to_backend(stencil)
+        stencil, fill_rank = make_stencil(self.gridshape, dtype)
+        self._stencil = (self._to_backend(stencil), self._to_backend(fill_rank))
 
-    def pad(self, points, verbose = 1):
+    def pad(self, points):
         """
         Pad input points to the number of slots of the grid.
         Used if n_points < n_grid for injective gridification.
 
         Parameters
         ----------
-        self.stencil : (ndarray of shape (n_grid, d))
-            (A pre-computed stencil containing 0.0 at allowed positions.)
         points : ndarray of shape (n_points, d)
-            The input data to map into the grid.
-        verbose : allow to shut up a warning that suggest saving results for 
-            the next time
+            The input data to be padded.
 
         Returns
         -------
@@ -181,25 +182,14 @@ class SquareNet:
         and points in the corner are fictive points with +- inf coordinates, using the stencil.
         """
         n_target = len(points)
-        if self.stencil is None:
-            if self.verbose + verbose >= 2:
-                print(
-                    "\n[SquareNet] Computing a stencil matching the number of points...\n"
-                    "Note: It might be an expensive operation, but the same \n"
-                    "stencil will work for same gridshape and number of points \n"
-                    " -> Consider saving and reusing it for the next time:\n"
-                    "    >>> saved_stencil = sn.stencil\n"
-                    "    >>> sn = SquareNet(..., stencil=saved_stencil)\n"
-                )
-            self._make_stencil(n_target=n_target, dtype=points.dtype)
-        elif self.xp.isfinite(self.stencil).sum() != self.D*n_target:
-            if self.verbose + verbose >= 2:
-                print(
-                    "\n[SquareNet] Update the stencil to match new number of points...\n"
-                )
-            self._make_stencil(n_target=n_target, dtype=points.dtype)
-
-        return fill_in(points, self.stencil, self.xp)
+        if len(points.shape) != 2:
+            raise ValueError(f"got incompatible shape for padding {points.shape}, should be (n_target, d)")
+        if n_target > self.N:
+            raise ValueError(f"points number {n_target} is too big for grid shape {self.gridshape}")
+        if n_target == self.N:
+            return points
+        stencil, fill_rank = self._stencil
+        return fill_in(points, stencil, fill_rank, self.xp)
     # ------------------------------------------------------------------
     # Core API
     # ------------------------------------------------------------------
@@ -224,6 +214,11 @@ class SquareNet:
         None
             The method updates the internal state of the grid in-place.
         
+        Note 
+        ----
+            If a cuda GPU and a pytorch installation are available, fit
+            is automatically performed on the GPU, which is much faster. 
+
         see ``squarenet.core``
         """
         old_backend = self.backend
@@ -257,7 +252,7 @@ class SquareNet:
         _log("Starting gridification... available method [fast, robust, ultimate]")
         _log(f"selected {method}")
 
-        _section(f"Carthesian sort")
+        _section(f"cartesian sort")
         mi = max_iter
         if method == "fast":
             _log(f"(max iter: {mi})")
@@ -266,18 +261,13 @@ class SquareNet:
         if method == "ultimate":
             _log(f"(max iter: 2 x {mi} + 4 x {mi} + {mi})")
 
-        grid, lc = carthesian_sort(grid, points, max_iter=max_iter, method = method,
+        grid, lc = cartesian_sort(grid, points, max_iter=max_iter, method = method,
                                     backend = self.backend, verbose = self.verbose)
 
         # --------------------------------------------------
         # Finalization
         # --------------------------------------------------
-        if isinstance(lc, tuple):
-            lc, last_iter = lc
-            self.learning_curve = list(lc)[:last_iter +1]
-        else:
-            self.learning_curve = list(lc)
-
+        self.learning_curve = list(lc)
         last_error = self.learning_curve[-1]
         last_iter = len(self.learning_curve) - 1
 
@@ -437,7 +427,7 @@ class SquareNet:
         gridpoints = np.ascontiguousarray(np.asarray(gridpoints))
         if save == False:
             save_path = None
-        plot_config = self.plot_config.copy()
+        plot_config = self.plot_config()
         plot_config.update(kwargs)
         plot_config.update({"style": style, "animate": animate, "save_path": save_path})
 

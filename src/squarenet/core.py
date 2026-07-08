@@ -11,10 +11,10 @@ def _load_backend(name: str):
             f"Unknown backend '{name}', expected one of {list(_BACKENDS)}"
         )
     module = import_module(_BACKENDS[name], package=__package__)
-    return getattr(module, f"{name}_carthesian_sort")
+    return getattr(module, f"{name}_cartesian_sort")
 
 
-def carthesian_sort(
+def cartesian_sort(
     gridmap,
     points,
     max_iter=100,

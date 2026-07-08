@@ -62,8 +62,6 @@ Display
 def default_config():
     return {
         "supported styles": _STYLES,
-        "config descr": _CONFIG_DESCR,
-
         # --- layout ---
         "figsize"   : (4, 4),
         # --- projection ---
@@ -85,16 +83,22 @@ def default_config():
         "show" : True,
     }
 
+default_config.__doc__ = _CONFIG_DESCR
 
 def kill_long_edges(x, threshold = 1):
     long_edge = (np.diff(x, axis = 0)**2).sum(axis = -1) >= threshold
     x[:-1][long_edge] = np.nan
     
 
-def atmost3D(gridpoints, projection=(0, 1, 2)):
-    if gridpoints.ndim <= 3:
-        return gridpoints
-    return project(gridpoints, feature_axes=projection)
+def validate(g):
+    g = np.asarray(g.astype(float)).copy()
+    g[~np.isfinite(g)] = np.nan
+    return g
+
+def atmost3D(g, projection=(0, 1, 2)):
+    if g.ndim <= 3:
+        return g
+    return project(g, feature_axes=projection)
 
 def _safe_path(path: str, suffix: str) -> Path:
     p = Path(path)
@@ -114,16 +118,14 @@ def _safe_path(path: str, suffix: str) -> Path:
 # GRID PREPROCESSING
 # =========================================================
 
-def _prepare_grid(grid, DS=1):
-    g = np.asarray(grid).copy()
-    g[~np.isfinite(g)] = np.nan
-    n1, n2 = grid.shape[:2]
+def _prepare_grid(g, DS=1):
+    n1, n2 = g.shape[:2]
     n3 = 1
     is3D = ((g.ndim -1) == 3)
     if is3D:
         n3 = g.shape[2]
     npoints = (n1*n2*n3)
-    if min(grid.shape[:-1]) <= 10: #downsampling (thin case)
+    if min(g.shape[:-1]) <= 10: #downsampling (thin case)
         if npoints > 100_000:
             DS = max(DS, 2)   
         if npoints > 300_000:
@@ -142,6 +144,7 @@ def _prepare_grid(grid, DS=1):
             DS = max(DS, 4)
 
 
+    safe_mean_g = np.nanmean(g.reshape(-1, g.shape[-1]), axis = 0)
 
     if is3D:
         g = g[::DS, ::DS, ::DS, :3]
@@ -150,14 +153,15 @@ def _prepare_grid(grid, DS=1):
             [-1,  1 / np.sqrt(3),  -np.sqrt(2)/ np.sqrt(3)],
             [ 0,  2 / np.sqrt(3), np.sqrt(2)/ np.sqrt(3)],
         ])
-        g = (g - np.nanmean(g, axis = (0, 1, 2), keepdims = True)) @ P
+        g = (g - safe_mean_g[None, None, None, :]) @ P
     else:
         g = g[::DS, ::DS, :2]
-        g = g - np.nanmean(g, axis = (0, 1), keepdims = True)
+        g = g - safe_mean_g[None, None, :]
 
     g_min, g_max = np.nanmin(g), np.nanmax(g)
 
-    return (g - g_min) / (g_max - g_min + 1e-8)
+    g = (g - g_min) / (g_max - g_min + 1e-8)
+    return g
 
 
 # =========================================================
@@ -438,29 +442,51 @@ def _build_animation(grid, cfg):
 def sqplot(grid, verbose, style="checkerboard", animate=False,
            save=True, save_path="sqrnet/plot", cfg=None):
     """
-    Render a structured grid — static snapshot or morphing animation.
+    Render a structured grid as either a static figure or a morphing animation.
+
+    The input grid is displayed using one of several rendering styles and may
+    optionally be animated by continuously interpolating between the input grid
+    and the corresponding identity grid.
 
     Parameters
     ----------
-    grid : np.ndarray
-        Input structured grid of shape (..., D) where D is 2 (2-D) or 3 (3-D).
-    style : str
-        One of ``"checkerboard"``, ``"mesh"``, or ``"scatter"``.
-        ``"scatter"`` draws every point as a plain dot: coloured by
-        depth (3rd coordinate after the isometric rotation) in 3-D,
-        or in black in 2-D.  No background grid is shown.
-    cfg  : dict, optional
-        Rendering configuration. Defaults to ``default_config()``.
-        Missing keys are filled in from the defaults, so you only need
-        to specify what you want to override.  Extra key for scatter:
-        ``"cmap_scatter"`` (default ``"viridis"``).
+    grid : ndarray
+        Structured grid of shape ``(..., D)``, where ``D`` is either 2 or 3.
+    verbose : bool
+        If ``True``, prints progress information while rendering or exporting.
+    style : {"checkerboard", "mesh", "scatter"}, default="checkerboard"
+        Rendering style.
+
+        - ``"checkerboard"``: alternating colours on adjacent grid cells.
+        - ``"mesh"``: draw the grid connectivity as a wireframe.
+        - ``"scatter"``: draw only the grid points. In 3-D, points are coloured
+        according to their depth after projection; in 2-D they are drawn in
+        black.
+    animate : bool, default=False
+        If ``True``, generate an animation interpolating between the input grid
+        and the identity grid. Otherwise, produce a single static figure.
+    save : bool, default=True
+        If ``True``, save the generated figure or animation to disk.
+    save_path : str, default="sqrnet/plot"
+        Output path used when ``save=True``.
+    cfg : dict, optional
+        Rendering configuration. Any omitted entries are filled with the default
+        values returned by ``default_config()``. See
+        ``help(default_config)`` for the complete list of supported options.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
+        The generated figure.
     ani : matplotlib.animation.FuncAnimation or None
-        ``None`` when ``cfg["animate"]`` is False.
+        The animation object if ``animate=True``; otherwise ``None``.
+
+    See Also
+    --------
+    default_config
+        Default rendering options and their documentation.
     """
+    grid = validate(grid)
     full_cfg = default_config()
     if cfg is not None:
         full_cfg.update(cfg)

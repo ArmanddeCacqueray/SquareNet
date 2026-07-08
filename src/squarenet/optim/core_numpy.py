@@ -6,11 +6,11 @@ from .numpy.hashtable import HashTable
 
 """"
 =============================================
-Carthesian sort - fast, robust and ultimate
+cartesian sort - fast, robust and ultimate
 =============================================
 """
 
-def numpy_carthesian_sort(
+def numpy_cartesian_sort(
     gridmap,
     points,
     method="fast",
@@ -20,9 +20,9 @@ def numpy_carthesian_sort(
     loopseq="decreasing"
 ):
     methods = {
-        "fast": fast_carthesian_sort,
-        "robust": robust_carthesian_sort,
-        "ultimate": ultimate_carthesian_sort,
+        "fast": fast_cartesian_sort,
+        "robust": robust_cartesian_sort,
+        "ultimate": ultimate_cartesian_sort,
     }
 
     if method not in methods:
@@ -71,9 +71,9 @@ def _check_convergence(g, Dims):
 
 
 def _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose):
-    """Apply end_loop then run a final fast_carthesian_sort pass."""
+    """Apply end_loop then run a final fast_cartesian_sort pass."""
     g = end_loop[g]
-    g, lc = fast_carthesian_sort(
+    g, lc = fast_cartesian_sort(
         g, points,
         max_iter=max_iter, verbose=verbose,
         loop=loop, loopseq=loopseq,
@@ -87,7 +87,7 @@ def _log(verbose, it, max_iter, done=False):
 
 
 # ─────────────────────────────────────────────
-# Core sort loop (used by fast_carthesian_sort)
+# Core sort loop (used by fast_cartesian_sort)
 # ─────────────────────────────────────────────
 
 def _run_sort_loop(g, Dims, circular_loop, max_iter, verbose, skip_first_heuristic=True):
@@ -121,7 +121,7 @@ def _run_sort_loop(g, Dims, circular_loop, max_iter, verbose, skip_first_heurist
 # Public API
 # ─────────────────────────────────────────────
 
-def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def fast_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """
     Args:
         gridmap (np.ndarray[int]): index map such that cloud_features[gridmap]
@@ -138,12 +138,12 @@ def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, lo
     return np.ascontiguousarray(g), learning_curve
 
 
-def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def robust_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """
     Robust variant: sorts only random independent subgrids each iteration to
-    escape local minima, then finishes with a standard fast_carthesian_sort pass.
+    escape local minima, then finishes with a standard fast_cartesian_sort pass.
 
-    Args / Returns: same as fast_carthesian_sort.
+    Args / Returns: same as fast_cartesian_sort.
     """
     g, Dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
     gshape = np.array(gridmap.shape)
@@ -181,17 +181,17 @@ def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, 
     return g, learning_curve + lc2
 
 
-def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def ultimate_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """
-    Ultimate variant: runs robust_carthesian_sort, then refines with a
+    Ultimate variant: runs robust_cartesian_sort, then refines with a
     HashTable-based sort phase for 4×max_iter iterations.
 
-    Args / Returns: same as fast_carthesian_sort.
+    Args / Returns: same as fast_cartesian_sort.
     """
     g, Dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
 
     # Phase 1 — robust sort
-    g, learning_curve = robust_carthesian_sort(
+    g, learning_curve = robust_cartesian_sort(
         g, points,
         max_iter=max_iter, verbose=verbose,
         loop=loop, loopseq=loopseq,

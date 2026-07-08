@@ -13,15 +13,15 @@ from .torch.hashtable import HashTable
 # Public API
 # ============================================================================
 
-def torch_carthesian_sort(gridmap, points, method="fast", max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def torch_cartesian_sort(gridmap, points, method="fast", max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     """PyTorch Cartesian sorting supporting CPU/GPU (Multi-method Dispatcher)."""
     if verbose >= 2:
         print(f"torch working ({method}) ...")
 
     methods = {
-        "fast": fast_carthesian_sort,
-        "robust": robust_carthesian_sort,
-        "ultimate": ultimate_carthesian_sort,
+        "fast": fast_cartesian_sort,
+        "robust": robust_cartesian_sort,
+        "ultimate": ultimate_cartesian_sort,
     }
 
     if method not in methods:
@@ -72,7 +72,7 @@ def _check_convergence(g, dims, circular_loop):
 
 def _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose):
     g = end_loop[g]
-    g, lc = fast_carthesian_sort(
+    g, lc = fast_cartesian_sort(
         g, points,
         max_iter=max_iter, verbose=verbose,
         loop=loop, loopseq=loopseq,
@@ -84,7 +84,7 @@ def _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose):
 # Core Sort Implementations
 # ============================================================================
 
-def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def fast_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
 
     learning_curve = []
@@ -111,10 +111,10 @@ def fast_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, lo
             break
 
     sorted_grid = end_loop[g]
-    return sorted_grid, torch.tensor(learning_curve, dtype=torch.int32, device=g.device)
+    return sorted_grid, learning_curve
 
 
-def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def robust_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
     gshape = list(gridmap.shape)
 
@@ -142,15 +142,15 @@ def robust_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, 
             break
 
     g, lc2 = _cleanup(g, points, end_loop, loop, loopseq, max_iter, verbose)
-    full_lc = torch.cat([torch.tensor(learning_curve, dtype=torch.int32, device=g.device), lc2])
-    return g, full_lc
+    learning_curve.extend(lc2)
+    return g, learning_curve
 
 
-def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
+def ultimate_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None, loopseq="decreasing"):
     g, dims, loop, circular_loop, end_loop = _prepare(gridmap, points, loop, loopseq)
 
     # Phase 1 — Robust sort
-    g, lc1 = robust_carthesian_sort(
+    g, lc1 = robust_cartesian_sort(
         g, points,
         max_iter=max_iter, verbose=verbose,
         loop=loop, loopseq=loopseq,
@@ -161,7 +161,7 @@ def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None
     circular = False
     chunk_size = 10
 
-    for big_it in range((4 * max_iter) // chunk_size):
+    for _ in range((4 * max_iter) // chunk_size):
         for _ in range(chunk_size):
             for heuristic in circular_loop:
                 if circular:
@@ -170,4 +170,4 @@ def ultimate_carthesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None
                 htable.sort()
 
     g, lc2 = _cleanup(htable.gtable, points, end_loop, loop, loopseq, max_iter, verbose)
-    return g, torch.cat([lc1, lc2])
+    return g, lc1.extend(lc2)
