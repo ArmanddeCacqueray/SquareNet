@@ -54,7 +54,7 @@ def to_backend(x, backend="numpy"):
     if backend == "torch":
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        return torch.as_tensor(arr, device=torch.device(device))
+        return torch.as_tensor(x, device=torch.device(device))
     # ------------------------------------------------------------------
     # JAX
     # ------------------------------------------------------------------
