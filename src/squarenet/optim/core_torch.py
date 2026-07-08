@@ -170,4 +170,5 @@ def ultimate_cartesian_sort(gridmap, points, max_iter=100, verbose=2, loop=None,
                 htable.sort()
 
     g, lc2 = _cleanup(htable.gtable, points, end_loop, loop, loopseq, max_iter, verbose)
-    return g, lc1.extend(lc2)
+    lc1.extend(lc2)
+    return g, lc1
