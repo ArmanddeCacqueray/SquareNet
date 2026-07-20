@@ -22,7 +22,9 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ## Example of gridification
 
-<img src="plots/squarenet_exemples.png">
+<p align="center">
+<img src="plots/squarenet_exemples.png" />
+</p>
 
 ---
 
