@@ -5,7 +5,7 @@
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
-<img src="https://raw.githubusercontent.com/ArmanddeCacqueray/SquareNet/main/plots/squarenet_exemples.png">
+<img src="https://raw.githubusercontent.com/ArmanddeCacqueray/SquareNet/main/plots/plot_6.png">
 
 SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: one point, one cell, no overlap, fully invertible.
 
@@ -22,7 +22,7 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ## Example of gridification
 
-<img src="plots/raw_grided2.png" width="400" alt="Raw" style="flex: 1;">
+<img src="plots/squarenet_exemples.png">
 
 ---
 
