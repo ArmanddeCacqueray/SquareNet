@@ -2,6 +2,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/squarenet.svg)](https://pypi.org/project/squarenet/)
 [![Documentation Status](https://readthedocs.org/projects/squarenet/badge/?version=latest)](https://squarenet.readthedocs.io/en/latest/)
 [![GitHub](https://img.shields.io/badge/GitHub-Source-6f42c1?logo=github)](https://github.com/ArmanddeCacqueray/SquareNet)
+[![HF demo](https://img.shields.io/badge/🤗%20Open%20in%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/adec314/point-to-grid)
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
