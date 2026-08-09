@@ -43,7 +43,7 @@ The mapping is bijective, so `invert_map` is exact — no information lost.
 
 ## ⚙️ The Cartesian Grid Sort Algorithm
 
-General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-grid-sort](https://github.com/ArmanddeCacqueray/Cartesian-Sort) - see auxiliary repository for demos - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
+General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-grid-sort](https://github.com/ArmanddeCacqueray/Cartesian-Sort) - see auxiliary repository - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
 
 
 ### Three fitting modes
