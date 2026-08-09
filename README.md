@@ -45,24 +45,6 @@ The mapping is bijective, so `invert_map` is exact — no information lost.
 
 General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-grid-sort](https://github.com/ArmanddeCacqueray/Cartesian-Sort) - see auxiliary repository for demos - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
 
-The idea is simple: loop over 1D Cartesian projections of the point cloud (x, y, z, ...) and sort points along the corresponding grid axis (rows, columns, ...). Each 1D sort is O(N log N) and fully vectorized. Since sorting along axis i+1 partially undoes the ordering along axis i, you repeat the full loop until all axes are sorted simultaneously — typically fewer than 50 iterations.
-
-**What you get:**
-
-- **Speed.** ⏱️ Millions of points in seconds. All operations are native tensor ops.
-- **Coordinate monotonicity.** x increases along rows, y along columns, etc. This enable potential N-dimensional dychotomy principle for certain algorithms.
-- **Approximate neighborhood preservation.** Points close in space land close in the grid. Concrete experimental results on a 1M-point 2D dataset (France map, `method='fast'`):
-  - Requesting a 11×11 square window ([i-5:i+6, j-5:j+6] = 0.01% of candidates) → recovers ~97% of true nearest neighbors
-  - Requesting a 31×31 square window ([i-15:i+16, j-15:j+16] = 0.1% of candidates) → recovers ~99.5%
-- **Volume conservation.** Bijectivity naturally leads to conservation of volumes (or more generally measures: $\int \rho(x)\, dV$ when density rho is not constant in the point cloud). By conservation of volume, it is **not** mean that $$\mathrm{vol}(g(A), g(B), g(C)) = \mathrm{vol}(A, B, C)$$ where $ABC$ is a triangle, since the image of a triangle is generally not a triangle anymore.
-It would be equal to $$\mathrm{vol}(\Omega),\qquad \Omega = \{ g(X) \mid X \in ABC \}$$
-
-**What you don't get:**
-
-- **Optimal Transport.** SquareNet trades exactness for speed. If you need the provably optimal assignment, this isn't the right tool.
-- **Reverse neighborhood preservation.** Close in space → close in grid, but *not* the other way around. Holes, clusters, and gaps in your data will be "closed" by the grid, which can place unrelated points next to each other.
-- **Angular preservation.** Volume and angles can't both be conserved in the general case (classical result). Expect some distortion, especially near boundaries.
-
 
 ### Three fitting modes
 
