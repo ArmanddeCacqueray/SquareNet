@@ -29,7 +29,7 @@ with a regular tensor structure allowing for massive parallelisation.
 
 ## 🚀 How it works
 
-You initialize SquareNet with a target grid shape, then call `fit()` on your point cloud. Under the hood, the **Cartesian sort** algorithm rearranges point indices into structured grid multi-indices.
+You initialize SquareNet with a target grid shape, then call `fit()` on your point cloud. Under the hood, the **Cartesian grid sort** algorithm rearranges point indices into structured grid multi-indices.
 
 ```
 raw points      #(N, D)       →  sn.fit(X)        →  grid  #(N1, N2, ..., ND)
@@ -41,9 +41,9 @@ The mapping is bijective, so `invert_map` is exact — no information lost.
 
 ---
 
-## ⚙️ The Cartesian Sort Algorithm
+## ⚙️ The Cartesian Grid Sort Algorithm
 
-General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-sort](https://github.com/ArmanddeCacqueray/Cartesian-Sort) - see auxiliary repository for demos - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
+General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-grid-sort](https://github.com/ArmanddeCacqueray/Cartesian-Sort) - see auxiliary repository for demos - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
 
 The idea is simple: loop over 1D Cartesian projections of the point cloud (x, y, z, ...) and sort points along the corresponding grid axis (rows, columns, ...). Each 1D sort is O(N log N) and fully vectorized. Since sorting along axis i+1 partially undoes the ordering along axis i, you repeat the full loop until all axes are sorted simultaneously — typically fewer than 50 iterations.
 
