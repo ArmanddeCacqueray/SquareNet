@@ -6,7 +6,7 @@
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
-This repository hosts the `SquareNet` python package for bijective gridification. SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: Each point is assigned to exactly one cell, and conversely. No holes, no overlaps: points are simply reindexed and reordered into a tensor layout. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the square/cubic/hypercubic grid as efficiently as possible. Basically, it’s a multi-indexing or multidimensional sorting algorithm.
+This repository hosts the `SquareNet` python package for bijective gridification. SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: Each point is assigned to exactly one cell, and conversely each cell to one point. No holes, no overlaps: points are simply reindexed and reordered into a tensor layout. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the square/cubic/hypercubic grid as efficiently as possible. Basically, it’s a multi-indexing or multidimensional sorting algorithm.
 
 The practical payoff: you replace expensive spatial queries (k-NN, radius search, neighborhood graphs) with plain tensor indexing. Think of it as an alternative to kd-trees, voxelization, rasterization, or graph-based approaches, but
 with a regular tensor structure allowing for massive parallelisation.
