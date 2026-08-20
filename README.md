@@ -6,7 +6,13 @@
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
 
-This repository hosts the `SquareNet` python package for bijective gridification. SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: Each point is assigned to exactly one cell, and conversely each cell to one point. No voids, no overlaps: points are simply reindexed and reordered into a tensor layout. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the adaptative square/cubic/hypercubic grid as efficiently as possible with the points of the dataset. Basically, it’s a multi-indexing or multidimensional sorting algorithm that works in arbitrary dimension. [^1]
+This repository hosts the `SquareNet` python package for bijective gridification. SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: Each point is assigned to exactly one cell, and conversely each cell to one point. No voids, no overlaps: points are simply reindexed and reordered into a tensor square/cubic/hypercubic layout. [^1]
+
+Concrete visual exemple bellow: 160k samples, 2D points dataset from the Germany map reshaped as a 400×400×2 tensor, by mapping (x,y) points to [i,j] cells of the grid. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the adaptative square grid as efficiently as possible with the points of the dataset. Basically, it’s a multi-indexing or multidimensional sorting algorithm. 
+
+<p align="center">
+<img src="plots/mesh.jpg" />
+</p>
 
 [^1]: To be more precise, the sweet spot for SquareNet grid structure is dimensions 2–5. Dimensions 6–10 are still OK, but increasingly challenging, while 11+ remains workable, but will require random projection techniques onto lower dimensional subspaces (see common RP-Trees/Forests tricks for more details).
 
