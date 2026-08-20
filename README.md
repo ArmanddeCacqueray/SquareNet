@@ -8,11 +8,7 @@
 
 This repository hosts the `SquareNet` python package for bijective gridification. SquareNet maps unstructured **point clouds** to structured grids through a **bijective transformation**: Each point is assigned to exactly one cell, and conversely each cell to one point. No voids, no overlaps: points are simply reindexed and reordered into a tensor square/cubic/hypercubic layout. [^1]
 
-Concrete visuaisation bellow: 160k samples, 2D points dataset from the Germany map reshaped as a 400×400×2 tensor, by mapping (x,y) points to [i,j] cells of the grid. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the adaptative square grid as efficiently as possible with the points of the dataset. Basically, it’s a multi-indexing or multidimensional sorting algorithm. 
-
-<p align="center">
-<img src="plots/cartesian_sort_illust2(1).png" />
-</p>
+Concrete visual example bellow: 160k samples, 2D points dataset from the Germany map reshaped as a 400×400×2 tensor, by mapping (x,y) points to [i,j] cells of the grid. Some extreme point in the bottom-left corner gets [0, 0], a nearby point to the right gets [0, 1], and so on, filling the adaptative square grid as efficiently as possible with the points of the dataset. Basically, it’s a multi-indexing or multidimensional sorting algorithm. 
 
 The practical payoff of the gridification preprocessing: you replace expensive spatial queries (k-NN, radius search, neighborhood graphs) with plain tensor indexing. Think of it as an alternative to kd-trees, voxelization, rasterization, or graph-based approaches, but
 with a regular tensor structure allowing for massive parallelisation.
@@ -29,6 +25,7 @@ with a regular tensor structure allowing for massive parallelisation.
 ## Visual Examples 
 
 <p align="center">
+<img src="plots/cartesian_sort_illust2(1).png" />
 <img src="plots/squarenet_exemples.png" />
 <img src="plots/cartesian_sort_illust.png" />
 </p>
