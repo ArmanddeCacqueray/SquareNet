@@ -57,7 +57,7 @@ General Optimal Transport (the theoretically correct solution to gridification) 
 |---|---|---|
 | `fast` (default) | Raw Cartesian sort | General use, large datasets |
 | `robust` | Sorts subgrids at each step | Less prone to local minima |
-| `ultimate` | Adds random shearing perturbations | Near-zero outliers, but slow and require tuning `max_iter` parameter (bigger = better, but depending on scale and geometry sometimes 100 iterations are fine, sometimes best results require 10_000 iterations = 20 minutes fit for 1-M points dataset) |
+| `ultimate` | Adds random shearing perturbations | Near-zero outliers, but slow and require tuning `max_iter` parameter (bigger = better, but slower) |
 
 ---
 
