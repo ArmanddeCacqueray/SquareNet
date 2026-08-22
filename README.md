@@ -42,13 +42,13 @@ flat data       #(N, *C)      →  sn.map(X)        →  structured tensor  #(N1
 structured tensor             →  sn.invert_map(X) →  back to flat view
 ```
 
-The mapping is bijective, so `invert_map` is exact — no information lost.
+The mapping is bijective, so `invert_map` is exact and no information is lost.
 
 ---
 
 ## ⚙️ The Cartesian Grid Sort Algorithm
 
-General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) — intractable at scale. [Cartesian-grid-sort](https://github.com/Space-filling-net/Cartesian-Grid-Sort) - see auxiliary repository - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
+General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) which is intractable at scale. [Cartesian-grid-sort](https://github.com/Space-filling-net/Cartesian-Grid-Sort) - see auxiliary repository - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
 
 
 ### Three fitting modes
@@ -124,10 +124,10 @@ sn.plot()
 
 ## 📈 When to use SquareNet
 
-- **Point cloud processing** — fast spatial queries (neighbors, subsets) with contiguous memory lookup
+- **Point cloud processing**: fast spatial queries (neighbors, subsets) with contiguous memory lookup
 and vectorized tensorial processing instead of irregular kd-tree/voxels data structure
-- **Kernel methods** — efficient approximation of large Gram matrices via the grid structure
-- **Deep learning** — convert flat point datasets into tensors ready for CNNs or attention-based models
+- **Kernel methods**: efficient approximation of large Gram matrices via the grid structure
+- **Deep learning**: convert flat point datasets into tensors ready for CNNs or attention-based models
 
 
 **License:** MIT | **Author:** [ArmanddeCacqueray](mailto:armand.de-cacqueray-valmenier@eleves.enpc.fr)
