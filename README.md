@@ -1,7 +1,7 @@
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Space-filling-net/SquareNet/blob/main/00_getting_started.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Neighborhood-Grid/SquareNet/blob/main/00_getting_started.ipynb)
 [![PyPI version](https://img.shields.io/pypi/v/squarenet.svg)](https://pypi.org/project/squarenet/)
 [![Documentation Status](https://readthedocs.org/projects/squarenet/badge/?version=latest)](https://squarenet.readthedocs.io/en/latest/)
-[![GitHub](https://img.shields.io/badge/GitHub-Source-6f42c1?logo=github)](https://github.com/Space-filling-net/SquareNet)
+[![GitHub](https://img.shields.io/badge/GitHub-Source-6f42c1?logo=github)](https://github.com/Neighborhood-Grid/SquareNet)
 [![HF demo](https://img.shields.io/badge/🤗%20Open%20in%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/adec314/point-to-grid)
 
 ## ❒ SquareNet — Bijective Gridification of Point Clouds
@@ -48,7 +48,7 @@ The mapping is bijective, so `invert_map` is exact and no information is lost.
 
 ## ⚙️ The Cartesian Grid Sort Algorithm
 
-General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) which is intractable at scale. [Cartesian-grid-sort](https://github.com/Space-filling-net/Cartesian-Grid-Sort) - see auxiliary repository - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
+General Optimal Transport (the theoretically correct solution to gridification) is O(N²) to O(N³) which is intractable at scale. [Cartesian-grid-sort](https://github.com/Neighborhood-Grid/Cartesian-Grid-Sort) - see auxiliary repository - is a fast heuristic that exploits the tensor structure of the grid to sidestep that complexity.
 
 
 ### Three fitting modes
@@ -71,7 +71,7 @@ pip install squarenet
 
 ## 🧠 Quick Start
 
-→ See [`00_getting_started.ipynb`](https://colab.research.google.com/github/Space-filling-net/SquareNet/blob/main/00_getting_started.ipynb)
+→ See [`00_getting_started.ipynb`](https://colab.research.google.com/github/Neighborhood-Grid/SquareNet/blob/main/00_getting_started.ipynb)
 
 ```python
 from squarenet import SquareNet
